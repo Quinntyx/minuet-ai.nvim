@@ -11,7 +11,22 @@
 - Add type annotations for new or changed code where practical, especially for
   public APIs, parameters, return values, and non-obvious table shapes.
 
-## Commit Messages & Communication
+## Writing
+
+Write in plain, simple language everywhere: comments, docstrings, commit
+messages, README documentation, and explanations to the user.
+
+### Comments & Docstrings
+
+- Describe only current behavior in docstrings and inline comments. Do not
+  mention what changed or contrast it with earlier behavior; record
+  behavior changes in commit messages or plans, where readers have the
+  relevant context.
+- Keep docstrings terse. No rationale, exhaustive edge cases, or
+  error-type names — "raises an error" is enough. Rationale belongs in
+  the commit message.
+
+### Commit Messages & Communication
 
 Write commit messages (and explanations to the user) in plain English for
 the user, who has not read the code:
@@ -21,3 +36,9 @@ the user, who has not read the code:
   depend on the order the placeholders are listed in".
 - Do not coin terminology (e.g. "walk-based expander", "placeholder DSL");
   say what the thing does instead.
+
+### README Documentation
+
+Keep README documentation simple and user-facing. Include only the
+technical detail needed to use and configure the package; omit internal
+implementation details.
