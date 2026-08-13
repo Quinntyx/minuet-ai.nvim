@@ -41,6 +41,7 @@ end
 function M.make_duet_llm_shot(context, chat_input)
     local values = vim.deepcopy(M.get_or_eval_value(chat_input)) or {}
     local template = M.get_or_eval_value(values.template) or ''
+    ---@cast template string
     values.template = nil
 
     return shared_utils.expand_template(template, values, function(value)
@@ -54,6 +55,7 @@ end
 function M.make_curl_args(end_point, headers, data_file, timeout)
     local root_config = M.get_root_config()
     local curl_extra_args = M.get_or_eval_value(root_config.curl_extra_args)
+    ---@cast curl_extra_args string[]
     local args = {}
 
     for _, arg in ipairs(curl_extra_args or {}) do

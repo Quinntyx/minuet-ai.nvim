@@ -115,7 +115,7 @@ local function benchmark_change_callback()
     local edits = require 'minuet.duet.edits'
     edits.setup()
 
-    local timer = vim.uv.new_timer()
+    local timer = assert(vim.uv.new_timer())
     local iterations = 100000
     local started = vim.uv.hrtime()
     for _ = 1, iterations do

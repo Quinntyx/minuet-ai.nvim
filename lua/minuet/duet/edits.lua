@@ -396,9 +396,13 @@ local function start_flush(bufnr)
 
     -- Copy a list-valued program so the -U flag and file paths are never
     -- appended onto the config table itself.
-    ---@type string[]
-    local cmd = type(config.diff_program) == 'table' and vim.list_extend({}, config.diff_program)
-        or { config.diff_program }
+    local diff_program = config.diff_program
+    local cmd
+    if type(diff_program) == 'table' then
+        cmd = vim.list_extend({}, diff_program)
+    else
+        cmd = { diff_program }
+    end
     vim.list_extend(cmd, { '-U' .. config.diff_context_lines, state.snapshot_file, state.pending_file })
 
     local ok, result = pcall(vim.system, cmd, { text = true, env = { LC_ALL = 'C' } }, on_exit)
@@ -407,11 +411,17 @@ local function start_flush(bufnr)
         -- The executable() check at setup passed, so the program vanished
         -- mid-session. Disable the recorder instead of failing on every
         -- burst.
+        local diff_program_name
+        if type(diff_program) == 'table' then
+            diff_program_name = table.concat(diff_program, ' ')
+        else
+            diff_program_name = diff_program
+        end
         internal.disabled = true
         require('minuet.utils').notify(
             string.format(
                 'minuet duet recent-edits recorder disabled: failed to run diff program "%s": %s',
-                type(config.diff_program) == 'table' and table.concat(config.diff_program, ' ') or config.diff_program,
+                diff_program_name,
                 result
             ),
             'error',
@@ -583,7 +593,12 @@ function M.ensure_setup()
     end
 
     local program = config.diff_program
-    local executable = type(program) == 'table' and (program[1] or '') or program
+    local executable
+    if type(program) == 'table' then
+        executable = program[1] or ''
+    else
+        executable = program
+    end
     if vim.fn.executable(executable) ~= 1 then
         -- Not marked started: the disabled flag alone blocks retries, and a
         -- reset (which clears it) lets a later start succeed once the
