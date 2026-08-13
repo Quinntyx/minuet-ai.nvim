@@ -231,6 +231,7 @@ end
 ---@field flush_timeout integer milliseconds an automatic prediction waits for in-flight recent-edit diffs; deliberately smaller than recent_edits.flush_timeout (used by manual prediction) so automatic triggering never stalls the editor for long
 ---@field auto_trigger_ft string[] filetypes where automatic duet prediction is enabled; an empty list disables automatic prediction
 ---@field auto_trigger_ignore_ft string[] filetypes excluded from automatic prediction, useful when auto_trigger_ft = { '*' }
+---@field enable_predicates (fun(): boolean)[] predicates run before an automatic prediction fires; a prediction is made only while all of them return true
 
 ---@class minuet.DuetRecentEdits
 ---@field enabled boolean|'lazy' 'lazy' starts the recorder on the first duet prediction, true starts it at plugin setup, false disables it entirely
@@ -282,6 +283,11 @@ local M = {
         -- filetypes excluded from automatic prediction, useful when
         -- auto_trigger_ft = { '*' }
         auto_trigger_ignore_ft = {},
+        -- predicates run before an automatic prediction fires; a prediction
+        -- is made only while all of them return true. An empty list (the
+        -- default) always evaluates to true. These predicates run on every
+        -- debounced text change, so keep them cheap.
+        enable_predicates = {},
     },
     editable_region = {
         lines_before = 8,

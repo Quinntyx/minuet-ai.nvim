@@ -1498,6 +1498,22 @@ require('minuet').setup {
 }
 ```
 
+To keep automatic predictions out of specific buffers, set
+`auto_trigger.enable_predicates` to a list of functions. A prediction is
+triggered only while every predicate returns true. Since these predicates
+execute before each request, ensure they are cheap.
+
+```lua
+auto_trigger = {
+    enable_predicates = {
+        function()
+            local name = vim.api.nvim_buf_get_name(vim.api.nvim_get_current_buf())
+            return vim.fn.fnamemodify(name, ':t') ~= '.env'
+        end,
+    },
+},
+```
+
 ## Recent Edits
 
 Duet silently records your recent edits in the background and includes them in
@@ -1552,6 +1568,7 @@ require('minuet').setup {
             flush_timeout = 50, -- Max milliseconds an automatic prediction waits for in-flight recent-edit diffs; smaller than recent_edits.flush_timeout (used by manual prediction) so automatic triggering never stalls the editor for long.
             auto_trigger_ft = {}, -- Filetypes where automatic duet prediction is enabled; an empty list disables automatic prediction.
             auto_trigger_ignore_ft = {}, -- Filetypes excluded from automatic prediction, useful when auto_trigger_ft = { '*' }.
+            enable_predicates = {}, -- Predicates run before an automatic prediction fires; a prediction is made only while all of them return true.
         },
         editable_region = {
             lines_before = 8, -- Number of editable lines included before the cursor.

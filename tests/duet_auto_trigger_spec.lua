@@ -60,7 +60,7 @@ return {
         end,
     },
     {
-        name = 'duet auto trigger stays quiet when disabled or gated by enable_predicates',
+        name = 'duet auto trigger stays quiet when disabled or gated by its own enable_predicates',
         run = function()
             helpers.setup_root_config {
                 duet = {
@@ -91,9 +91,9 @@ return {
             end, 10)
             helpers.expect_equal(complete_count, 0, 'auto trigger fired in a buffer where it is disabled')
 
-            -- With the buffer enabled but a failing predicate, it must stay
-            -- quiet as well.
-            require('minuet').config.enable_predicates = {
+            -- With the buffer enabled but a failing duet predicate, it must
+            -- stay quiet as well.
+            require('minuet').config.duet.auto_trigger.enable_predicates = {
                 function()
                     return false
                 end,
@@ -105,6 +105,50 @@ return {
                 return false
             end, 10)
             helpers.expect_equal(complete_count, 0, 'auto trigger fired despite a failing enable predicate')
+
+            helpers.delete_buffer(bufnr)
+        end,
+    },
+    {
+        name = 'duet auto trigger ignores the global enable_predicates',
+        run = function()
+            helpers.setup_root_config {
+                duet = {
+                    provider = 'test',
+                    auto_trigger = {
+                        debounce = 20,
+                    },
+                },
+            }
+
+            -- The global predicate list gates inline completion only; duet
+            -- has its own list, so a failing global predicate must not stop
+            -- an automatic prediction.
+            require('minuet').config.enable_predicates = {
+                function()
+                    return false
+                end,
+            }
+
+            local complete_count = 0
+
+            package.loaded['minuet.duet.backends.test'] = {
+                complete = function()
+                    complete_count = complete_count + 1
+                end,
+            }
+
+            local duet = helpers.reload 'minuet.duet'
+            duet.setup()
+
+            local bufnr = create_normal_buffer({ 'return 1' }, { 1, 8 })
+            duet.action.enable_auto_trigger()
+
+            vim.api.nvim_exec_autocmds('TextChangedI', { buffer = bufnr, modeline = false })
+
+            helpers.wait_until(function()
+                return complete_count > 0
+            end, 1000, 'auto trigger did not fire despite the global predicate list being irrelevant')
 
             helpers.delete_buffer(bufnr)
         end,

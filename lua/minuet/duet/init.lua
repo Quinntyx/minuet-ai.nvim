@@ -169,7 +169,7 @@ local function schedule(bufnr)
             or vim.bo[bufnr].buftype ~= ''
             or not vim.bo[bufnr].modifiable
             or shared_utils.completion_menu_visible()
-            or not shared_utils.run_hooks_until_failure(config.enable_predicates)
+            or not shared_utils.run_hooks_until_failure(config.duet.auto_trigger.enable_predicates)
         then
             return
         end
