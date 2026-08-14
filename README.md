@@ -1514,6 +1514,25 @@ auto_trigger = {
 },
 ```
 
+**Example: inline completion in insert mode, duet prediction in normal mode**
+
+```lua
+require('minuet').setup {
+    duet = {
+        auto_trigger = {
+            auto_trigger_ft = { 'lua', 'python' },
+            enable_predicates = {
+                function()
+                    -- Fire duet prediction only in normal mode; inline
+                    -- completion happens in insert mode.
+                    return vim.fn.mode() == 'n'
+                end,
+            },
+        },
+    },
+}
+```
+
 ## Recent Edits
 
 Duet silently records your recent edits in the background and includes them in
