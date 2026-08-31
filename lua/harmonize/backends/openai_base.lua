@@ -178,24 +178,24 @@ function M.complete_openai_fim_base(options, get_text_fn, context, callback, on_
     })
 
     for idx = 1, n_completions do
-        -- The raw text accumulated from the stream so far. When `on_update` is
-        -- given, every token is delivered to it as it arrives, so the caller
-        -- can render the growing completion without waiting for the request.
+        -- The raw text accumulated from the stream so far. Each update sends
+        -- the complete snapshot so rendering does not depend on how curl splits
+        -- stdout into chunks.
         local accumulated = ''
         local raw_buffer = ''
         local received_tokens = false
 
         local function consume_line(line)
-            if line == 'data: [DONE]' then
+            line = line:gsub('\r$', '')
+            local stripped = line:match('^data:%s*(.*)$') or line
+            if stripped == '' or stripped == '[DONE]' then
                 return
             end
-            -- Assign first: gsub returns an extra count value that must not
-            -- leak into the pcall arguments.
-            local stripped = line:gsub('^data:%s*', '')
+
             local success, json = pcall(vim.json.decode, stripped)
             if success and json and json.choices and json.choices[1] then
-                local text = get_text_fn(json)
-                if type(text) == 'string' and text ~= '' then
+                local ok, text = pcall(get_text_fn, json)
+                if ok and type(text) == 'string' and text ~= '' then
                     accumulated = accumulated .. text
                     if on_update then
                         on_update(accumulated)
@@ -205,7 +205,7 @@ function M.complete_openai_fim_base(options, get_text_fn, context, callback, on_
         end
 
         local new_job = common.start_job(config.curl_cmd, args, {
-            on_stdout = function(_, data)
+            on_stdout = options.stream and function(_, data)
                 if not data or #data == 0 then
                     return
                 end
@@ -220,7 +220,7 @@ function M.complete_openai_fim_base(options, get_text_fn, context, callback, on_
                     consume_line(line)
                 end
                 received_tokens = #accumulated > 0
-            end,
+            end or nil,
             on_exit = function(_, out)
                 utils.run_event('HarmonizeRequestFinished', {
                     provider = provider_name,

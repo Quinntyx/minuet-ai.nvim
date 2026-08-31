@@ -44,7 +44,7 @@ end
 
 ---@class harmonize.JobHandlers
 ---@field on_exit fun(job: vim.SystemObj, result: vim.SystemCompleted)
----@field on_stdout? fun(err: string|nil, data: string|nil) Receive streamed output line by line.
+---@field on_stdout? fun(err: string|nil, data: string|nil) Receive arbitrary streamed stdout chunks.
 ---@field on_spawn_error? fun()
 
 ---@param command string

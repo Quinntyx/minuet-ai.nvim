@@ -141,14 +141,13 @@ local function update_preview(ctx)
     end
 
     if require('harmonize').config.virtualtext.display_singleline and #display_lines > 1 then
-        if display_lines[1] ~= '' then
-            -- Show only the remainder of the current line.
+        if display_lines[1] == '' then
+            -- Preserve the empty inline line so the next line renders below
+            -- the cursor, but do not let later streamed lines enter the viewport.
+            display_lines = { '', display_lines[2] }
+        else
             display_lines = { display_lines[1] }
         end
-        -- When the completion starts with a newline, the current line is
-        -- already complete: keep the empty leading line so the following
-        -- lines render below the cursor instead of inline to its right,
-        -- matching where accepting them actually puts them.
     end
 
     local annot = ''
@@ -292,8 +291,8 @@ local function trigger(bufnr)
 
         update_preview(ctx)
     end, function(text)
-        -- Streamed tokens: render the growing completion without waiting for
-        -- the request to finish.
+        -- Each update is the complete response received so far. Replacing the
+        -- snapshot keeps rendering independent of token and stdout chunk sizes.
         if timestamp ~= internal.current_completion_timestamp then
             return
         end
@@ -301,7 +300,7 @@ local function trigger(bufnr)
         if ctx.stream ~= stream then
             return
         end
-        stream.raw = stream.raw .. text
+        stream.raw = text
         if not ctx.choice then
             ctx.choice = 1
         end
