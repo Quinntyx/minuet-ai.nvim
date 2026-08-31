@@ -12,7 +12,10 @@
   `foo.` `bar(` `a, ` `b).` `baz(` `c)`). A chunk never crosses a newline
   unless the newline is the first character of the completion, matching what
   the `display_singleline` view shows; a run like `)\n.` is accepted as
-  `)` and then `\n.`.
+  `)` and then `\n.`. When the identifier of the current chunk has already
+  been typed, the special characters that follow it end that chunk: after
+  typing the `r` of `r#my_var_name`, the next chunk is `#` and only after
+  that `my_var_name`.
 
 # Version 0.10.0 (2026-07-31)
 

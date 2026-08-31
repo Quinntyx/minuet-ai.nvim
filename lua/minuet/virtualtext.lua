@@ -296,9 +296,11 @@ local action = {}
 
 ---Split a suggestion at the next chunk boundary. A chunk is the current
 ---identifier (alphanumeric characters and underscores) together with the
----special characters that follow it, and it stops where the next identifier
----begins. When the suggestion starts with special characters (for example a
----newline right after accepting the previous line), they lead into the chunk.
+---special characters that follow it. When the suggestion starts with special
+---characters, those belong to the end of the previous chunk (its identifier
+---was already typed), so they form their own chunk that stops where the next
+---identifier begins: after typing "r" of "r#my_var_name", the next chunk is
+---"#" and only then "my_var_name".
 ---
 ---A chunk never crosses a newline unless the newline is the first character
 ---of the suggestion. That is the only case in which the single-line display
@@ -313,15 +315,14 @@ local function split_chunk(suggestion)
         -- line shown when the single-line view is active).
         leading = '\n' .. (suggestion:match('^[^%w_\n]+', 2) or '')
     else
-        leading = suggestion:match('^[^%w_\n]+') or ''
+        leading = suggestion:match('^[^%w_\n]+')
     end
-    local pos = #leading + 1
-
-    local ident = suggestion:match('^[%w_]+', pos)
-    if ident then
-        pos = pos + #ident
+    if leading then
+        return leading, suggestion:sub(#leading + 1)
     end
 
+    local ident = suggestion:match('^[%w_]+')
+    local pos = #ident + 1
     local trailing = suggestion:match('^[^%w_\n]+', pos) or ''
     pos = pos + #trailing
 
