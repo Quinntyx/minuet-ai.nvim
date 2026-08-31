@@ -16,8 +16,6 @@ function M.setup(config)
     config.presets = nil
 
     M.config = vim.tbl_deep_extend('force', default_config, config or {})
-
-    require 'minuet.deprecate'
 end
 
 

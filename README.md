@@ -31,7 +31,6 @@
   - [`Minuet virtualtext`](#minuet-virtualtext)
 - [API](#api)
   - [Virtual Text](#virtual-text)
-  - [Lualine](#lualine)
   - [Minuet Event](#minuet-event)
     - [Standard Completion Events](#standard-completion-events)
     - [Event Data](#event-data)
@@ -1093,42 +1092,6 @@ Example usage: `Minuet virtualtext toggle`, `Minuet virtualtext enable`,
     require('minuet.virtualtext').action.is_visible,
 }
 ```
-
-## Lualine
-
-Minuet provides a Lualine component that displays the current status of Minuet requests. This component shows:
-
-- The name of the active provider and model
-- The current request count (e.g., "1/3")
-- An animated spinner while processing
-
-To use the Minuet Lualine component, add it to your Lualine configuration:
-
-<details>
-
-```lua
-require('lualine').setup {
-    sections = {
-        lualine_x = {
-            {
-                require 'minuet.lualine',
-                -- the follwing is the default configuration
-                -- the name displayed in the lualine. Set to "provider", "model" or "both"
-                -- display_name = 'both',
-                -- separator between provider and model name for option "both"
-                -- provider_model_separator = ':',
-                -- whether show display_name when no completion requests are active
-                -- display_on_idle = false,
-            },
-            'encoding',
-            'fileformat',
-            'filetype',
-        },
-    },
-}
-```
-
-</details>
 
 ## Minuet Event
 
