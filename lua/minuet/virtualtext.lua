@@ -299,19 +299,32 @@ local action = {}
 ---special characters that follow it, and it stops where the next identifier
 ---begins. When the suggestion starts with special characters (for example a
 ---newline right after accepting the previous line), they lead into the chunk.
+---
+---A chunk never crosses a newline unless the newline is the first character
+---of the suggestion. That is the only case in which the single-line display
+---shows the line below, so accepting a chunk never inserts text the view did
+---not show; a run like ")\n." is split into two chunks (")" and "\n.").
 ---@param suggestion string
 ---@return string, string The next chunk and the remaining suggestion.
 local function split_chunk(suggestion)
-    local leading = suggestion:match '^([^%w_]+)'
-    local pos = leading and (#leading + 1) or 1
+    local leading
+    if suggestion:sub(1, 1) == '\n' then
+        -- A leading newline is only allowed at the very start (matching the
+        -- line shown when the single-line view is active).
+        leading = '\n' .. (suggestion:match('^[^%w_\n]+', 2) or '')
+    else
+        leading = suggestion:match('^[^%w_\n]+') or ''
+    end
+    local pos = #leading + 1
+
     local ident = suggestion:match('^[%w_]+', pos)
     if ident then
         pos = pos + #ident
     end
-    local trailing = suggestion:match('^([^%w_]+)', pos)
-    if trailing then
-        pos = pos + #trailing
-    end
+
+    local trailing = suggestion:match('^[^%w_\n]+', pos) or ''
+    pos = pos + #trailing
+
     return suggestion:sub(1, pos - 1), suggestion:sub(pos)
 end
 
