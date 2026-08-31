@@ -300,39 +300,48 @@ end
 
 local action = {}
 
----Split a suggestion at the next chunk boundary. A chunk is the current
----identifier (alphanumeric characters and underscores) together with the
----special characters that follow it. When the suggestion starts with special
----characters, those belong to the end of the previous chunk (its identifier
----was already typed), so they form their own chunk that stops where the next
----identifier begins: after typing "r" of "r#my_var_name", the next chunk is
----"#" and only then "my_var_name".
+---Split a suggestion at the next chunk boundary. Walk the suggestion one
+---character at a time: consume alphanumeric characters and underscores, and
+---the first special character switches to terminating mode. In that mode the
+---next alphanumeric character ends the chunk and is excluded from it, so a
+---chunk is one identifier plus the special characters that follow it. When
+---the suggestion starts with special characters, those close out the
+---previous chunk (its identifier was already typed): after typing "r" of
+---"r#my_var_name", the next chunk is "#" and only then "my_var_name".
 ---
 ---A chunk never crosses a newline unless the newline is the first character
 ---of the suggestion. That is the only case in which the single-line display
 ---shows the line below, so accepting a chunk never inserts text the view did
 ---not show; a run like ")\n." is split into two chunks (")" and "\n.").
+---Termination rules plug into the character walk, so more elaborate ones (for
+---example skipping a closing quote) can be added later.
 ---@param suggestion string
 ---@return string, string The next chunk and the remaining suggestion.
 local function split_chunk(suggestion)
-    local leading
-    if suggestion:sub(1, 1) == '\n' then
-        -- A leading newline is only allowed at the very start (matching the
-        -- line shown when the single-line view is active).
-        leading = '\n' .. (suggestion:match('^[^%w_\n]+', 2) or '')
-    else
-        leading = suggestion:match('^[^%w_\n]+')
-    end
-    if leading then
-        return leading, suggestion:sub(#leading + 1)
+    local terminates = false
+
+    for pos = 1, #suggestion do
+        local byte = suggestion:byte(pos)
+        if byte == 10 then
+            -- A newline may only lead a chunk: it ends the chunk anywhere else.
+            if pos == 1 then
+                terminates = true
+            else
+                return suggestion:sub(1, pos - 1), suggestion:sub(pos)
+            end
+        elseif byte == 95 or (byte >= 48 and byte <= 57) or (byte >= 65 and byte <= 90) or (byte >= 97 and byte <= 122) then
+            -- Alphanumeric or underscore. In terminating mode the chunk ends
+            -- here, leaving this character and the rest for the next chunk.
+            if terminates then
+                return suggestion:sub(1, pos - 1), suggestion:sub(pos)
+            end
+        else
+            -- Any other character switches to terminating mode.
+            terminates = true
+        end
     end
 
-    local ident = suggestion:match('^[%w_]+')
-    local pos = #ident + 1
-    local trailing = suggestion:match('^[^%w_\n]+', pos) or ''
-    pos = pos + #trailing
-
-    return suggestion:sub(1, pos - 1), suggestion:sub(pos)
+    return suggestion, ''
 end
 
 action.next = function()
