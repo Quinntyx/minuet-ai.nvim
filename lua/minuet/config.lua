@@ -180,37 +180,6 @@ default_chat_input_prefix_first.template =
     '{{{language}}}\n{{{tab}}}\n<contextBeforeCursor>\n{{{context_before_cursor}}}<cursorPosition>\n<contextAfterCursor>\n{{{context_after_cursor}}}'
 
 local M = {
-    -- LSP is recommended only for built-in completion.
-    lsp = {
-        enabled_ft = {},
-        -- Filetypes excluded from LSP activation. Useful when `enabled_ft` = { '*' }
-        disabled_ft = {},
-        completion = {
-            enable = true,
-            -- if true, warn the user that they should use the built-in LSP
-            -- completion source instead when they are not using virtual text.
-            -- See README section [Built-in Completion, Mini.Completion, and LSP
-            -- Setup] for more details on this option.
-            adjust_indentation = true,
-            -- Enables automatic completion triggering using `vim.lsp.completion.enable`
-            enabled_auto_trigger_ft = {},
-            -- Filetypes excluded from autotriggering. Useful when `enabled_auto_trigger_ft` = { '*' }
-            disabled_auto_trigger_ft = {},
-        },
-        inline_completion = {
-            enable = false,
-            -- if true, warn the user when LSP inline completion is enabled
-            -- while Minuet virtual text is also configured for use.
-            warn_on_virtualtext = true,
-            -- if true, warn the user when both LSP completion and inline
-            -- completion are enabled. Enabling only one of them is recommended.
-            warn_on_lsp_completion = true,
-            -- Enables automatic inline completion for these filetypes.
-            enabled_auto_trigger_ft = {},
-            -- Filetypes excluded from inline completion autotriggering.
-            disabled_auto_trigger_ft = {},
-        },
-    },
     virtualtext = {
         -- Specify the filetypes to enable automatic virtual text completion,
         -- e.g., { 'python', 'lua' }. Note that you can still invoke manual
@@ -276,10 +245,7 @@ local M = {
     -- Extra arguments passed to curl (list of strings, or a function returning a list of strings).
     ---@type string[] | fun(): string[]
     curl_extra_args = {},
-    -- If completion item has multiple lines, add another item containing
-    -- only its first line, for the built-in LSP completion source.
-    add_single_line_entry = true,
-    --  Length of context after cursor used to filter completion text.
+    -- Length of context after cursor used to filter completion text.
     --
     -- This setting helps prevent the language model from generating redundant
     -- text.  When filtering completions, the system compares the suffix of a

@@ -13,30 +13,10 @@ function M.setup(config)
 
     config.presets = nil
 
-    -- Migrate deprecated flat LSP keys into nested lsp.completion.*
-    if config.lsp then
-        local flat_to_nested = {
-            enabled_auto_trigger_ft = 'enabled_auto_trigger_ft',
-            disabled_auto_trigger_ft = 'disabled_auto_trigger_ft',
-            adjust_indentation = 'adjust_indentation',
-        }
-        for flat_key, nested_key in pairs(flat_to_nested) do
-            if config.lsp[flat_key] ~= nil then
-                config.lsp[flat_key] = nil
-                vim.deprecate(
-                    'minuet.config.lsp.' .. flat_key,
-                    'minuet.config.lsp.completion.' .. nested_key,
-                    'next release',
-                    'minuet',
-                    false
-                )
-            end
-        end
-    end
+    config.presets = nil
 
     M.config = vim.tbl_deep_extend('force', default_config, config or {})
 
-    require('minuet.lsp').setup()
     require 'minuet.deprecate'
 end
 
@@ -153,12 +133,6 @@ local function minuet_complete(arglead, cmdline, _)
 
     local completions = {
         virtualtext = { enable = true, disable = true, toggle = true },
-        lsp = {
-            attach = true,
-            detach = true,
-            completion = { enable_auto_trigger = true, disable_auto_trigger = true },
-            inline_completion = { enable_auto_trigger = true, disable_auto_trigger = true },
-        },
         change_model = complete_change_model_options,
         change_provider = function()
             local providers = {}
@@ -226,8 +200,6 @@ vim.api.nvim_create_user_command('Minuet', function(args)
         disable = require('minuet.virtualtext').action.disable_auto_trigger,
         toggle = require('minuet.virtualtext').action.toggle_auto_trigger,
     }
-
-    actions.lsp = require('minuet.lsp').actions
 
     actions.change_provider = setmetatable({}, {
         __index = function(_, key)

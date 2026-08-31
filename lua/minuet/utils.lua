@@ -198,38 +198,6 @@ function M.make_cmp_context(blink_context)
     return self
 end
 
----@class minuet.LSPPositionParams
----@field context {triggerKind: number}
----@field position {character: number, line: number}
----@field textDocument {uri: string}
-
----@param params minuet.LSPPositionParams
-function M.make_cmp_context_from_lsp_params(params)
-    local bufnr
-    local self = {}
-    if params.textDocument.uri == 'file://' then
-        bufnr = 0
-    else
-        bufnr = vim.uri_to_bufnr(params.textDocument.uri)
-    end
-
-    local row = params.position.line
-    local col = math.max(params.position.character, 0)
-    self.cursor = {
-        row = row,
-        line = row,
-        col = col,
-    }
-
-    local current_line = vim.api.nvim_buf_get_lines(bufnr, row, row + 1, false)[1] or ''
-    local cursor_before_line = vim.fn.strcharpart(current_line, 0, col)
-    local cursor_after_line = vim.fn.strcharpart(current_line, col)
-
-    self.cursor_before_line = cursor_before_line
-    self.cursor_after_line = cursor_after_line
-    return self
-end
-
 --- Get the context around the cursor position for code completion
 ---@param cmp_context table The completion context object containing cursor position and line info
 ---@return table Context information with the following fields:
@@ -426,54 +394,6 @@ function M.find_longest_match(a, b)
     return ''
 end
 
---- If the last word of b is not a substring of the first word of a,
---- And it there are no trailing spaces for b and no leading spaces for a,
---- prepend the last word of b to a.
----@param a string?
----@param b string?
----@return string?
-function M.prepend_to_complete_word(a, b)
-    if not a or not b then
-        return a
-    end
-
-    local last_word_b = b:match '[%w_-]+$'
-    local first_word_a = a:match '^[%w_-]+'
-
-    if last_word_b and first_word_a and not first_word_a:find(last_word_b, 1, true) then
-        a = last_word_b .. a
-    end
-
-    return a
-end
-
----Adjust indentation of lines based on direction
----@param lines string The string containing the lines to adjust
----@param ref_line string The reference line used to adjust identation
----@param direction "+" | "-" "+" for adding, "-" for removing
----@return string Lines Adjusted lines
-function M.adjust_indentation(lines, ref_line, direction)
-    local indentation = string.match(ref_line or '', '^%s*') or ''
-
-    ---@diagnostic disable-next-line:cast-local-type
-    lines = vim.split(lines, '\n')
-    local new_lines = {}
-
-    for _, line in ipairs(lines) do
-        if direction == '+' then
-            table.insert(new_lines, indentation .. line)
-        elseif direction == '-' then
-            -- Remove indentation if it exists at the start of the line
-            if line:sub(1, #ref_line) == indentation then
-                line = line:sub(#ref_line + 1)
-            end
-            table.insert(new_lines, line)
-        end
-    end
-
-    return table.concat(new_lines, '\n')
-end
-
 ---@param context table
 ---@param template table Chat input spec: `template` (string or string[]) plus placeholder values.
 ---@return string[]
@@ -603,21 +523,6 @@ function M.stream_decode(response, data_file, provider, get_text_fn)
 
     return result_str
 end
-
-M.add_single_line_entry = function(list)
-    local newlist = {}
-
-    for _, item in ipairs(list) do
-        if type(item) == 'string' then
-            -- single line completion item should be preferred.
-            table.insert(newlist, item)
-            table.insert(newlist, 1, vim.split(item, '\n')[1])
-        end
-    end
-
-    return newlist
-end
-
 --- dedup the items in a list
 M.list_dedup = function(list)
     local hash = {}
