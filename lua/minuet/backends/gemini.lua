@@ -48,7 +48,7 @@ local function make_request_data()
 
     few_shots = M.transform_openai_chat_to_gemini_chat(few_shots)
 
-    local system = utils.make_system_prompt(options.system, config.n_completions)
+    local system = utils.make_system_prompt(options.system, 1)
 
     local request_data = {
         system_instruction = {

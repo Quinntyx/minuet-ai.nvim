@@ -46,7 +46,6 @@ llama-server \
 ```lua
 require('minuet').setup {
     provider = 'openai_fim_compatible',
-    n_completions = 1, -- recommend for local model for resource saving
     -- I recommend beginning with a small context window size and incrementally
     -- expanding it, depending on your local computing power. A context window
     -- of 512, serves as an good starting point to estimate your computing

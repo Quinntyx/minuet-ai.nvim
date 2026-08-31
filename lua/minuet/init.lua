@@ -18,7 +18,6 @@ function M.setup(config)
         local flat_to_nested = {
             enabled_auto_trigger_ft = 'enabled_auto_trigger_ft',
             disabled_auto_trigger_ft = 'disabled_auto_trigger_ft',
-            warn_on_blink_or_cmp = 'warn_on_blink_or_cmp',
             adjust_indentation = 'adjust_indentation',
         }
         for flat_key, nested_key in pairs(flat_to_nested) do
@@ -37,37 +36,11 @@ function M.setup(config)
 
     M.config = vim.tbl_deep_extend('force', default_config, config or {})
 
-    local has_cmp = pcall(require, 'cmp')
-
-    if has_cmp then
-        require('cmp').register_source('minuet', require('minuet.cmp'):new())
-    end
-
     require('minuet.duet').setup()
-    require('minuet.virtualtext').setup()
     require('minuet.lsp').setup()
     require 'minuet.deprecate'
 end
 
-function M.make_cmp_map()
-    local cmp = require 'cmp'
-    return cmp.mapping(cmp.mapping.complete {
-        config = {
-            ---@diagnostic disable-next-line: redundant-parameter
-            sources = cmp.config.sources {
-                { name = 'minuet' },
-            },
-        },
-    })
-end
-
-function M.make_blink_map()
-    return {
-        function(cmp)
-            cmp.show { providers = { 'minuet' } }
-        end,
-    }
-end
 
 local function complete_change_model_options()
     local modelcard = require 'minuet.modelcard'
@@ -180,8 +153,6 @@ local function minuet_complete(arglead, cmdline, _)
     end
 
     local completions = {
-        cmp = { enable = true, disable = true, toggle = true },
-        blink = { enable = true, disable = true, toggle = true },
         duet = { predict = true, apply = true, dismiss = true, enable = true, disable = true, toggle = true },
         virtualtext = { enable = true, disable = true, toggle = true },
         lsp = {
@@ -251,22 +222,6 @@ vim.api.nvim_create_user_command('Minuet', function(args)
 
     local actions = {}
 
-    for _, complete_frontend in ipairs { 'blink', 'cmp' } do
-        actions[complete_frontend] = {
-            enable = function()
-                M.config[complete_frontend].enable_auto_complete = true
-                vim.notify('Minuet ' .. complete_frontend .. ' enabled', vim.log.levels.INFO)
-            end,
-            disable = function()
-                M.config[complete_frontend].enable_auto_complete = false
-                vim.notify('Minuet ' .. complete_frontend .. ' disabled', vim.log.levels.INFO)
-            end,
-            toggle = function()
-                M.config[complete_frontend].enable_auto_complete = not M.config[complete_frontend].enable_auto_complete
-                vim.notify('Minuet ' .. complete_frontend .. ' toggled', vim.log.levels.INFO)
-            end,
-        }
-    end
 
     actions.virtualtext = {
         enable = require('minuet.virtualtext').action.enable_auto_trigger,

@@ -15,7 +15,7 @@ end
 local function make_request_data()
     local config = require('minuet').config
     local options = vim.deepcopy(config.provider_options.claude)
-    local system = utils.make_system_prompt(options.system, config.n_completions)
+    local system = utils.make_system_prompt(options.system, 1)
 
     local request_data = {
         system = system,

@@ -180,30 +180,15 @@ default_chat_input_prefix_first.template =
     '{{{language}}}\n{{{tab}}}\n<contextBeforeCursor>\n{{{context_before_cursor}}}<cursorPosition>\n<contextAfterCursor>\n{{{context_after_cursor}}}'
 
 local M = {
-    -- Enable or disable auto-completion. Note that you still need to add
-    -- Minuet to your cmp/blink sources. This option controls whether cmp/blink
-    -- will attempt to invoke minuet when minuet is included in cmp/blink
-    -- sources. This setting has no effect on manual completion; Minuet will
-    -- always be enabled when invoked manually. You can use the command
-    -- `MinuetToggleCmp/Blink` to toggle this option.
-    cmp = {
-        enable_auto_complete = true,
-    },
-    blink = {
-        enable_auto_complete = true,
-    },
-    -- LSP is recommended only for built-in completion. If you are using
-    -- `cmp` or `blink`, utilizing LSP for code completion from Minuet is *not*
-    -- recommended.
+    -- LSP is recommended only for built-in completion.
     lsp = {
         enabled_ft = {},
         -- Filetypes excluded from LSP activation. Useful when `enabled_ft` = { '*' }
         disabled_ft = {},
         completion = {
             enable = true,
-            -- if true, warn the user that they should use the native source
-            -- instead when the user is using blink or nvim-cmp.
-            warn_on_blink_or_cmp = true,
+            -- if true, warn the user that they should use the built-in LSP
+            -- completion source instead when they are not using virtual text.
             -- See README section [Built-in Completion, Mini.Completion, and LSP
             -- Setup] for more details on this option.
             adjust_indentation = true,
@@ -249,8 +234,8 @@ local M = {
             prev = nil,
             dismiss = nil,
         },
-        -- Whether show virtual text suggestion when the completion menu
-        -- (nvim-cmp or blink-cmp) is visible.
+        -- Whether to show virtual text suggestion when a
+        -- completion menu is visible.
         show_on_completion_menu = false,
         -- Show only the remainder of the current line of the completion.
         -- When the completion starts with a newline, the current line is
@@ -291,17 +276,9 @@ local M = {
     -- Extra arguments passed to curl (list of strings, or a function returning a list of strings).
     ---@type string[] | fun(): string[]
     curl_extra_args = {},
-    -- If completion item has multiple lines, create another completion item
-    -- only containing its first line. This option only has impact for cmp and
-    -- blink. For virtualtext, no single line entry will be added.
+    -- If completion item has multiple lines, add another item containing
+    -- only its first line, for the built-in LSP completion source.
     add_single_line_entry = true,
-    -- The number of completion items encoded as part of the prompt for the
-    -- chat LLM. For FIM model, this is the number of requests to send. It's
-    -- important to note that when 'add_single_line_entry' is set to true, the
-    -- actual number of returned items may exceed this value. Additionally, the
-    -- chat LLM cannot guarantee the exact number of completion items
-    -- specified, as this parameter serves only as a prompt guideline.
-    n_completions = 3,
     --  Length of context after cursor used to filter completion text.
     --
     -- This setting helps prevent the language model from generating redundant
@@ -452,9 +429,8 @@ M.presets = {}
 
 -- **List** of functions to execute. If any function returns `false`, Minuet
 -- will not trigger auto-completion. Manual completion can still be invoked,
--- even if these functions evaluate to `false`, when using `nvim-cmp`,
--- `blink-cmp`, or virtual text (excluding LSP).
--- When this list is empty (the default), it always evaluates to `true`.
+-- even if these functions evaluate to `false`, when using virtual text
+-- (excluding LSP).
 -- Note that this is called each time Minuet attempts to trigger
 -- auto-completion, so ensure the functions in this list are highly efficient.
 ---@type (fun(): boolean)[]

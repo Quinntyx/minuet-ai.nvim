@@ -189,9 +189,7 @@ function M.add_tab_comment()
     return commentstring .. ' ' .. tab_string
 end
 
--- Copied from blink.cmp.Context. Because we might use nvim-cmp instead of
--- blink-cmp, so blink might not be installed, so we create another class here
--- and use it instead.
+-- A self-contained copy of the context shape completion menus use.
 
 --- @class minuet.BlinkCmpContext
 --- @field line string
@@ -726,8 +724,8 @@ function M.run_hooks_until_failure(hooks, ...)
     return true
 end
 
----Whether a completion menu (nvim-cmp, blink-cmp, or the builtin popup menu)
----is currently visible.
+---Whether a completion menu (the builtin popup menu, or a menu from
+---nvim-cmp or blink-cmp used for other sources) is currently visible.
 ---@return boolean
 function M.completion_menu_visible()
     local has_cmp = pcall(require, 'cmp')

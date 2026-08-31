@@ -279,8 +279,9 @@ system = {
 ```
 
 Note that `n_completion_template` is a special placeholder as it contains one
-`%d` which will be encoded with `config.n_completions`, if you want to
-customize this template, make sure your prompt also contains only one `%d`.
+`%d` which is always formatted with the number of completions requested
+(currently always 1). If you customize this template, make sure your prompt also
+contains only one `%d`.
 
 Similarly, `few_shots` can be a table in the following form or a function that
 takes no argument and returns a table in the following form:

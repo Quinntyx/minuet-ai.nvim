@@ -28,7 +28,7 @@ function M.complete_openai_base(options, context, callback)
 
     local few_shots = vim.deepcopy(utils.get_or_eval_value(options.few_shots))
 
-    local system = utils.make_system_prompt(options.system, config.n_completions)
+    local system = utils.make_system_prompt(options.system, 1)
 
     table.insert(few_shots, 1, { role = 'system', content = system })
     vim.list_extend(few_shots, ctx)
@@ -163,7 +163,8 @@ function M.complete_openai_fim_base(options, get_text_fn, context, callback)
     local args = utils.make_curl_args(transformed_data.end_point, transformed_data.headers, data_file)
 
     local items = {}
-    local n_completions = config.n_completions
+    -- A single completion candidate: virtual text can only show one at a time.
+    local n_completions = 1
 
     local provider_name = 'openai_fim_compatible'
     local timestamp = os.time()

@@ -4,8 +4,6 @@
 - [Installation](#installation)
 - [Quick Start](#quick-start)
   - [Virtual Text Setup](#virtual-text-setup)
-  - [Nvim-cmp setup](#nvim-cmp-setup)
-  - [Blink-cmp Setup](#blink-cmp-setup)
   - [In-Process LSP for Built-in Completion and Inline Completion](#in-process-lsp-for-built-in-completion-and-inline-completion)
     - [Completion](#completion)
     - [Inline completion](#inline-completion)
@@ -33,7 +31,6 @@
 - [Commands](#commands)
   - [`Minuet change_provider`, `Minuet change_model`](#minuet-change_provider-minuet-change_model)
   - [`Minuet change_preset`](#minuet-change_preset)
-  - [`Minuet blink`, `Minuet cmp`](#minuet-blink-minuet-cmp)
   - [`Minuet virtualtext`](#minuet-virtualtext)
   - [`Minuet duet`](#minuet-duet)
   - [`Minuet lsp`](#minuet-lsp)
@@ -51,9 +48,6 @@
     - [Duet Events](#duet-events)
     - [Event Data](#event-data)
 - [FAQ](#faq)
-  - [Customize `cmp` ui for source icon and kind icon](#customize-cmp-ui-for-source-icon-and-kind-icon)
-  - [Customize `blink` ui for source icon and kind icon](#customize-blink-ui-for-source-icon-and-kind-icon)
-  - [Significant Input Delay When Moving to a New Line with `nvim-cmp`](#significant-input-delay-when-moving-to-a-new-line-with-nvim-cmp)
   - [Integration with `lazyvim`](#integration-with-lazyvim)
 - [Enhancement](#enhancement)
   - [RAG (Experimental)](#rag-experimental)
@@ -79,9 +73,8 @@ Just as dancers move during a minuet.
 - Customizable configuration options.
 - Streaming support to enable completion delivery even with slower LLMs.
 - No proprietary binary running in the background. Just curl and your preferred LLM provider.
-- Support `virtual-text`, `nvim-cmp`, `blink-cmp`, `built-in`,
-  `mini.completion` frontend.
-- Act as an **in-process LSP** server to provide completions (opt-in feature).
+- Support the `virtual-text` frontend and the `built-in` LSP frontend.
+
 - Accept multi-line suggestions line-by-line, so longer suggestions can be
   pulled in incrementally in your own pace.
 - When your typed text matches the start of a suggestion, Minuet keeps the
@@ -90,9 +83,6 @@ Just as dancers move during a minuet.
 - Support next-edit prediction (NES) via `Minuet duet` commands. This feature
   is highly experimental.
 
-**With nvim-cmp / blink-cmp frontend**:
-
-![example-cmp](./assets/example-cmp.png)
 
 **With builtin completion frontend** (requires nvim 0.11+):
 
@@ -114,8 +104,7 @@ https://github.com/user-attachments/assets/b98699d5-b81d-4061-a1b3-d6f581c6b9b0
 # Requirements
 
 - Neovim 0.10+.
-- optional: [nvim-cmp](https://github.com/hrsh7th/nvim-cmp)
-- optional: [blink.cmp](https://github.com/Saghen/blink.cmp)
+- An API key for at least one of the supported AI providers
 - An API key for at least one of the supported AI providers
 - ~~[plenary.nvim](https://github.com/nvim-lua/plenary.nvim)~~ Minuet now uses
   the builtin `vim.system` and no longer requires plenary.
@@ -133,12 +122,10 @@ specs = {
                 -- Your configuration options here
             }
         end,
+        end,
     },
-    -- optional, if you are using virtual-text frontend, nvim-cmp is not
-    -- required.
-    { 'hrsh7th/nvim-cmp' },
-    -- optional, if you are using virtual-text frontend, blink is not required.
-    { 'Saghen/blink.cmp' },
+}
+```
 }
 ```
 
@@ -174,75 +161,6 @@ require('minuet').setup {
     },
 }
 ```
-
-## Nvim-cmp setup
-
-<details>
-
-```lua
-require('cmp').setup {
-    sources = {
-        {
-             -- Include minuet as a source to enable autocompletion
-            { name = 'minuet' },
-            -- and your other sources
-        }
-    },
-    performance = {
-        -- It is recommended to increase the timeout duration due to
-        -- the typically slower response speed of LLMs compared to
-        -- other completion sources. This is not needed when you only
-        -- need manual completion.
-        fetching_timeout = 2000,
-    },
-}
-
-
--- If you wish to invoke completion manually,
--- The following configuration binds `A-y` key
--- to invoke the configuration manually.
-require('cmp').setup {
-    mapping = {
-        ["<A-y>"] = require('minuet').make_cmp_map()
-        -- and your other keymappings
-    },
-}
-```
-
-</details>
-
-## Blink-cmp Setup
-
-<details>
-
-```lua
-require('blink-cmp').setup {
-    keymap = {
-        -- Manually invoke minuet completion.
-        ['<A-y>'] = require('minuet').make_blink_map(),
-    },
-    sources = {
-         -- Enable minuet for autocomplete
-        default = { 'lsp', 'path', 'buffer', 'snippets', 'minuet' },
-        -- For manual completion only, remove 'minuet' from default
-        providers = {
-            minuet = {
-                name = 'minuet',
-                module = 'minuet.blink',
-                async = true,
-                -- Should match minuet.config.request_timeout * 1000,
-                -- since minuet.config.request_timeout is in seconds
-                timeout_ms = 3000,
-                score_offset = 50, -- Gives minuet higher priority among suggestions
-            },
-        },
-    },
-    -- Recommended to avoid unnecessary request
-    completion = { trigger = { prefetch_on_insert = false } },
-}
-```
-
-</details>
 
 ## In-Process LSP for Built-in Completion and Inline Completion
 
@@ -288,22 +206,11 @@ For manually triggered completion, ensure `vim.bo.omnifunc` is set to
 
 **Recommendation:**
 
-For users of `blink-cmp` and `nvim-cmp`, it is recommended to use the native
-source rather than through LSP for two main reasons:
-
-1. `blink-cmp` and `nvim-cmp` offer better sorting and async management when
-   Minuet is utilized as a separate source rather than alongside a regular LSP
-   such as `clangd`.
-2. With `blink-cmp` and `nvim-cmp` native sources, it's possible to configure
-   Minuet for manual completion only, disabling automatic completion. However,
-   when Minuet operates as an LSP server, it is impossible to determine whether
-   completion is triggered automatically or manually.
-
-   The LSP protocol specification defines three `triggerKind` values:
-   `Invoked`, `TriggerCharacter`, and `TriggerForIncompleteCompletions`.
-   However, none of these specifically differentiates between manual and
-   automatic completion requests.
-
+Minuet's virtual text frontend is recommended over the built-in LSP
+completion source: it renders suggestions inline without fighting the LSP
+completion machinery, and it distinguishes manual invocation from
+auto-triggering internally. The LSP protocol cannot tell automatic from
+manual completion requests.
 **Note**:
 
 - An upstream issue ([tracked
@@ -495,7 +402,6 @@ require('minuet').setup {
 ```lua
 require('minuet').setup {
     provider = 'openai_fim_compatible',
-    n_completions = 1, -- recommend for local model for resource saving
     -- I recommend beginning with a small context window size and incrementally
     -- expanding it, depending on your local computing power. A context window
     -- of 512, serves as an good starting point to estimate your computing
@@ -540,7 +446,6 @@ llama-server \
 ```lua
 require('minuet').setup {
     provider = 'openai_fim_compatible',
-    n_completions = 1, -- recommend for local model for resource saving
     -- I recommend beginning with a small context window size and incrementally
     -- expanding it, depending on your local computing power. A context window
     -- of 512, serves as an good starting point to estimate your computing
@@ -629,32 +534,14 @@ generation speed.
 
 Minuet AI comes with the following defaults:
 
-```lua
 default_config = {
-    -- Enable or disable auto-completion. Note that you still need to add
-    -- Minuet to your cmp/blink sources. This option controls whether cmp/blink
-    -- will attempt to invoke minuet when minuet is included in cmp/blink
-    -- sources. This setting has no effect on manual completion; Minuet will
-    -- always be enabled when invoked manually. You can use the command
-    -- `Minuet cmp/blink toggle` to toggle this option.
-    cmp = {
-        enable_auto_complete = true,
-    },
-    blink = {
-        enable_auto_complete = true,
-    },
-    -- LSP is recommended only for built-in completion. If you are using
-    -- `cmp` or `blink`, utilizing LSP for code completion from Minuet is *not*
-    -- recommended.
+    -- LSP is recommended only for built-in completion.
     lsp = {
         enabled_ft = {},
         -- Filetypes excluded from LSP activation. Useful when `enabled_ft` = { '*' }
         disabled_ft = {},
         completion = {
             enable = true,
-            -- if true, warn the user that they should use the native source
-            -- instead when the user is using blink or nvim-cmp.
-            warn_on_blink_or_cmp = true,
             -- See README In-Process LSP section for more details on this option.
             adjust_indentation = true,
             -- Enables automatic completion triggering using `vim.lsp.completion.enable`
@@ -698,8 +585,8 @@ default_config = {
             prev = nil,
             dismiss = nil,
         },
-        -- Whether show virtual text suggestion when the completion menu
-        -- (nvim-cmp or blink-cmp) is visible.
+        -- Whether to show virtual text suggestion when a
+        -- completion menu is visible.
         show_on_completion_menu = false,
         -- Show only the remainder of the current line of the completion.
         -- When the completion starts with a newline, the current line is
@@ -739,17 +626,9 @@ default_config = {
     curl_cmd = 'curl',
     -- Extra arguments passed to curl (list of strings, or a function returning a list of strings).
     curl_extra_args = {},
-    -- If completion item has multiple lines, create another completion item
-    -- only containing its first line. This option only has impact for cmp and
-    -- blink. For virtualtext, no single line entry will be added.
+    -- If completion item has multiple lines, add another item containing
+    -- only its first line, for the built-in LSP completion source.
     add_single_line_entry = true,
-    -- The number of completion items encoded as part of the prompt for the
-    -- chat LLM. For FIM model, this is the number of requests to send. It's
-    -- important to note that when 'add_single_line_entry' is set to true, the
-    -- actual number of returned items may exceed this value. Additionally, the
-    -- LLM cannot guarantee the exact number of completion items specified, as
-    -- this parameter serves only as a prompt guideline.
-    n_completions = 3,
     --  Length of context after cursor used to filter completion text.
     --
     -- This setting helps prevent the language model from generating redundant
@@ -781,8 +660,8 @@ default_config = {
     proxy = nil,
     -- **List** of functions to execute. If any function returns `false`, Minuet
     -- will not trigger auto-completion. Manual completion can still be invoked,
-    -- even if these functions evaluate to `false`, when using `nvim-cmp`,
-    -- `blink-cmp`, or virtual text (excluding LSP).
+    -- even if these functions evaluate to `false`, when using virtual text
+    -- (excluding LSP).
     -- When this list is empty (the default), it always evaluates to `true`.
     -- Note that this is called each time Minuet attempts to trigger
     -- auto-completion, so ensure the functions in this list are highly efficient.
@@ -1381,16 +1260,6 @@ require('minuet').setup {
 
 </details>
 
-## `Minuet blink`, `Minuet cmp`
-
-Enable or disable autocompletion for `nvim-cmp` or `blink.cmp`. While Minuet
-must be added to your cmp/blink sources, this command only controls whether
-Minuet is triggered during autocompletion. The command does not affect manual
-completion behavior - Minuet remains active and available when manually
-invoked.
-
-Example usage: `Minuet blink toggle`, `Minuet blink enable`, `Minuet blink disable`
-
 ## `Minuet virtualtext`
 
 Enable or disable the automatic display of `virtual-text` completion in the
@@ -1791,264 +1660,11 @@ Each event includes a `data` field containing the following properties:
 
 # FAQ
 
-## Customize `cmp` ui for source icon and kind icon
-
-You can configure the icons of completion items returned by `minuet` by using
-the following snippet (referenced from [cmp's
-wiki](https://github.com/hrsh7th/nvim-cmp/wiki/Menu-Appearance#basic-customisations)):
-
-<details>
-
-```lua
-local kind_icons = {
-    Number = '󰎠',
-    Array = '',
-    Variable = '',
-    -- and other icons
-    -- LLM Provider icons
-    claude = '󰋦',
-    openai = '󱢆',
-    codestral = '󱎥',
-    gemini = '',
-    Groq = '',
-    Openrouter = '󱂇',
-    Ollama = '󰳆',
-    ['Llama.cpp'] = '󰳆',
-    Deepseek = ''
-    -- FALLBACK
-    fallback = '',
-}
-
-local source_icons = {
-    minuet = '󱗻',
-    nvim_lsp = '',
-    lsp = '',
-    buffer = '',
-    luasnip = '',
-    snippets = '',
-    path = '',
-    git = '',
-    tags = '',
-    -- FALLBACK
-    fallback = '󰜚',
-}
-
-local cmp = require 'cmp'
-cmp.setup {
-    formatting = {
-        format = function(entry, vim_item)
-            -- Kind icons
-            -- This concatenates the icons with the name of the item kind
-            vim_item.kind = string.format('%s %s', kind_icons[vim_item.kind] or kind_icons.fallback, vim_item.kind)
-            -- Source
-            vim_item.menu = source_icons[entry.source.name] or source_icons.fallback
-            return vim_item
-        end,
-    },
-}
-```
-
-</details>
-
-## Customize `blink` ui for source icon and kind icon
-
-You can configure the icons of completion items returned by `minuet` by the following snippet:
-
-<details>
-
-To customize the kind icons:
-
-```lua
-local kind_icons = {
-    -- LLM Provider icons
-    claude = '󰋦',
-    openai = '󱢆',
-    codestral = '󱎥',
-    gemini = '',
-    Groq = '',
-    Openrouter = '󱂇',
-    Ollama = '󰳆',
-    ['Llama.cpp'] = '󰳆',
-    Deepseek = ''
-}
-
-require('blink-cmp').setup {
-    appearance = {
-        use_nvim_cmp_as_default = true,
-        nerd_font_variant = 'normal',
-        kind_icons = kind_icons
-    },
-}
-
-```
-
-To customize the source icons:
-
-```lua
-local source_icons = {
-    minuet = '󱗻',
-    orgmode = '',
-    otter = '󰼁',
-    nvim_lsp = '',
-    lsp = '',
-    buffer = '',
-    luasnip = '',
-    snippets = '',
-    path = '',
-    git = '',
-    tags = '',
-    cmdline = '󰘳',
-    latex_symbols = '',
-    cmp_nvim_r = '󰟔',
-    codeium = '󰩂',
-    -- FALLBACK
-    fallback = '󰜚',
-}
-
-require('blink-cmp').setup {
-    appearance = {
-        use_nvim_cmp_as_default = true,
-        nerd_font_variant = 'normal',
-        kind_icons = kind_icons
-    },
-    completion = {
-        menu = {
-            draw = {
-                columns = {
-                    { 'label', 'label_description', gap = 1 },
-                    { 'kind_icon', 'kind' },
-                    { 'source_icon' },
-                },
-                components = {
-                    source_icon = {
-                        -- don't truncate source_icon
-                        ellipsis = false,
-                        text = function(ctx)
-                            return source_icons[ctx.source_name:lower()] or source_icons.fallback
-                        end,
-                        highlight = 'BlinkCmpSource',
-                    },
-                },
-            },
-        },
-    }
-}
-```
-
-</details>
-
-## Significant Input Delay When Moving to a New Line with `nvim-cmp`
-
-When using Minuet with auto-complete enabled, you may occasionally experience a
-noticeable delay when pressing `<CR>` to move to the next line. This occurs
-because Minuet triggers autocompletion at the start of a new line, while cmp
-blocks the `<CR>` key, awaiting Minuet's response.
-
-To address this issue, consider the following solutions:
-
-1. Unbind the `<CR>` key from your cmp keymap.
-2. Utilize cmp's internal API to avoid blocking calls, though be aware that
-   this API may change without prior notice.
-
-Here's an example of the second approach using Lua:
-
-```lua
-local cmp = require 'cmp'
-opts.mapping = {
-    ['<CR>'] = cmp.mapping(function(fallback)
-        -- use the internal non-blocking call to check if cmp is visible
-        if cmp.core.view:visible() then
-            cmp.confirm { select = true }
-        else
-            fallback()
-        end
-    end),
-}
-```
-
 ## Integration with `lazyvim`
 
-<details>
-
-**With nvim-cmp**:
-
-```lua
-{
-    'milanglacier/minuet-ai.nvim',
-    config = function()
-        require('minuet').setup {
-            -- Your configuration options here
-        }
-    end
-},
-{
-    'nvim-cmp',
-    optional = true,
-    opts = function(_, opts)
-        -- if you wish to use autocomplete
-        table.insert(opts.sources, 1, {
-            name = 'minuet',
-            group_index = 1,
-            priority = 100,
-        })
-
-        opts.performance = {
-            -- It is recommended to increase the timeout duration due to
-            -- the typically slower response speed of LLMs compared to
-            -- other completion sources. This is not needed when you only
-            -- need manual completion.
-            fetching_timeout = 2000,
-        }
-
-        opts.mapping = vim.tbl_deep_extend('force', opts.mapping or {}, {
-            -- if you wish to use manual complete
-            ['<A-y>'] = require('minuet').make_cmp_map(),
-        })
-    end,
-}
-```
-
-**With blink-cmp**:
-
-```lua
--- set the following line in your config/options.lua
-vim.g.lazyvim_blink_main = true
-
-{
-    'milanglacier/minuet-ai.nvim',
-    config = function()
-        require('minuet').setup {
-            -- Your configuration options here
-        }
-    end,
-},
-{
-    'saghen/blink.cmp',
-    optional = true,
-    opts = {
-        keymap = {
-            ['<A-y>'] = {
-                function(cmp)
-                    cmp.show { providers = { 'minuet' } }
-                end,
-            },
-        },
-        sources = {
-            -- if you want to use auto-complete
-            default =  { 'minuet' },
-            providers = {
-                minuet = {
-                    name = 'minuet',
-                    module = 'minuet.blink',
-                    score_offset = 100,
-                },
-            },
-        },
-    },
-}
-```
-
-</details>
+Minuet's virtual text frontend needs no integration with lazyvim's completion
+setup: add the plugin, call `require('minuet').setup { ... }`, and the ghost
+text works alongside lazyvim as-is.
 
 # Enhancement
 
@@ -2096,7 +1712,6 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 # Acknowledgement
 
-- [cmp-ai](https://github.com/tzachar/cmp-ai): Reference for the integration with `nvim-cmp`.
 - [continue.dev](https://www.continue.dev): not a neovim plugin, but I find a lot LLM models from here.
 - [copilot.lua](https://github.com/zbirenbaum/copilot.lua): Reference for the virtual text frontend.
 - [llama.vim](https://github.com/ggml-org/llama.vim): Reference for CLI parameters used to launch the llama-cpp server.

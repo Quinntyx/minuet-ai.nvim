@@ -17,6 +17,18 @@
   been typed, the special characters that follow it end that chunk: after
   typing the `r` of `r#my_var_name`, the next chunk is `#` and only after
   that `my_var_name`.
+  typing the `r` of `r#my_var_name`, the next chunk is `#` and only after
+  that `my_var_name`.
+
+## Removed
+
+- The nvim-cmp and blink-cmp frontends are gone; virtual text is now the only
+  completion frontend, alongside the built-in LSP sources. The `cmp` and
+  `blink` config keys, `make_cmp_map`/`make_blink_map`, the `Minuet cmp` /
+  `Minuet blink` commands, and `lsp.completion.warn_on_blink_or_cmp` were
+  removed with them.
+- The `n_completions` option is gone: virtual text can only show one
+  completion at a time, so exactly one candidate is always generated.
 
 # Version 0.10.0 (2026-07-31)
 

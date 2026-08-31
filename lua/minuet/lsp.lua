@@ -129,8 +129,8 @@ M.request_handler['textDocument/completion'] = function(_, params, callback, not
                 return
             end
 
-            -- The `blink.lua` comments explain the rationale for invoking
-            -- `prepend_to_complete_word`.
+            -- Prepend the text before the cursor so the completion item
+            -- replaces it.
             data = vim.tbl_map(function(item)
                 if config.lsp.completion.adjust_indentation then
                     -- FIXME: Refer to [neovim/neovim#32972] for the rationale behind this
@@ -183,14 +183,6 @@ M.request_handler['textDocument/completion'] = function(_, params, callback, not
                     },
                     kind = vim.lsp.protocol.CompletionItemKind.Text,
                     detail = config.provider_options[config.provider].name or config.provider,
-                    -- for nvim-cmp
-                    cmp = {
-                        kind_text = config.provider_options[config.provider].name or config.provider,
-                        kind_hl = 'LspKindMinuet',
-                    },
-                    -- for blink-cmp
-                    kind_name = config.provider_options[config.provider].name or config.provider,
-                    kind_hl_group = 'LspKindMinuet',
                 })
             end
 
@@ -406,21 +398,6 @@ end
 
 function M.setup()
     local config = require('minuet').config
-
-    local has_cmp = pcall(require, 'cmp')
-    local has_blink = pcall(require, 'blink-cmp')
-
-    if
-        config.lsp.completion.enable
-        and (has_cmp or has_blink)
-        and (#config.lsp.enabled_ft > 0)
-        and config.lsp.completion.warn_on_blink_or_cmp
-    then
-        vim.notify(
-            'Blink or Nvim-cmp detected, it is recommended to use the native source instead of lsp',
-            vim.log.levels.WARN
-        )
-    end
 
     if
         config.lsp.inline_completion.enable
