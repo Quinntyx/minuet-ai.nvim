@@ -126,7 +126,7 @@ function M.complete_openai_base(options, context, callback)
     })
 end
 
-function M.complete_openai_fim_base(options, get_text_fn, context, callback)
+function M.complete_openai_fim_base(options, get_text_fn, context, callback, on_update)
     local config = require('minuet').config
 
     common.terminate_all_jobs()
@@ -178,7 +178,49 @@ function M.complete_openai_fim_base(options, get_text_fn, context, callback)
     })
 
     for idx = 1, n_completions do
+        -- The raw text accumulated from the stream so far. When `on_update` is
+        -- given, every token is delivered to it as it arrives, so the caller
+        -- can render the growing completion without waiting for the request.
+        local accumulated = ''
+        local raw_buffer = ''
+        local received_tokens = false
+
+        local function consume_line(line)
+            if line == 'data: [DONE]' then
+                return
+            end
+            -- Assign first: gsub returns an extra count value that must not
+            -- leak into the pcall arguments.
+            local stripped = line:gsub('^data:%s*', '')
+            local success, json = pcall(vim.json.decode, stripped)
+            if success and json and json.choices and json.choices[1] then
+                local text = get_text_fn(json)
+                if type(text) == 'string' and text ~= '' then
+                    accumulated = accumulated .. text
+                    if on_update then
+                        on_update(accumulated)
+                    end
+                end
+            end
+        end
+
         local new_job = common.start_job(config.curl_cmd, args, {
+            on_stdout = function(_, data)
+                if not data or #data == 0 then
+                    return
+                end
+                raw_buffer = raw_buffer .. data
+                while true do
+                    local nl = raw_buffer:find('\n', 1, true)
+                    if not nl then
+                        break
+                    end
+                    local line = raw_buffer:sub(1, nl - 1)
+                    raw_buffer = raw_buffer:sub(nl + 1)
+                    consume_line(line)
+                end
+                received_tokens = #accumulated > 0
+            end,
             on_exit = function(_, out)
                 utils.run_event('MinuetRequestFinished', {
                     provider = provider_name,
@@ -189,9 +231,20 @@ function M.complete_openai_fim_base(options, get_text_fn, context, callback)
                     timestamp = timestamp,
                 })
 
+                -- A trailing line may arrive without a trailing newline.
+                if #raw_buffer > 0 then
+                    consume_line(raw_buffer)
+                    raw_buffer = ''
+                end
+                received_tokens = #accumulated > 0
+
                 local result
 
-                if options.stream then
+                if received_tokens then
+                    -- The stream already delivered the text token by token.
+                    vim.uv.fs_unlink(data_file)
+                    result = accumulated
+                elseif options.stream then
                     result = utils.stream_decode(out, data_file, options.name, get_text_fn)
                 else
                     result = utils.no_stream_decode(out, data_file, options.name, get_text_fn)

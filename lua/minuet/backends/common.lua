@@ -44,6 +44,7 @@ end
 
 ---@class minuet.JobHandlers
 ---@field on_exit fun(job: vim.SystemObj, result: vim.SystemCompleted)
+---@field on_stdout? fun(err: string|nil, data: string|nil) Receive streamed output line by line.
 ---@field on_spawn_error? fun()
 
 ---@param command string
@@ -54,12 +55,20 @@ function M.start_job(command, args, handlers)
     local cmd = { command }
     vim.list_extend(cmd, args)
 
+    local opts = { text = true }
+
+    if handlers.on_stdout then
+        opts.stdout = vim.schedule_wrap(function(err, data)
+            handlers.on_stdout(err, data)
+        end)
+    end
+
     ---@type vim.SystemObj?
     local job
     local ok, result = pcall(
         vim.system,
         cmd,
-        { text = true },
+        opts,
         vim.schedule_wrap(function(out)
             if not job then
                 return

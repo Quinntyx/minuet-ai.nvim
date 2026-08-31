@@ -20,6 +20,15 @@
   typing the `r` of `r#my_var_name`, the next chunk is `#` and only after
   that `my_var_name`.
 
+## Streaming
+
+- Streamed completions are rendered token by token as they arrive, so a
+  longer `max_tokens` no longer means a longer wait for the first chunk.
+  The completion is a character stream: the model keeps appending to the
+  back up to the `max_tokens` cap while Tab or typing takes from the front,
+  and the remaining text is re-rendered on every token within the single-line
+  viewport rules.
+
 ## Removed
 
 - The nvim-cmp and blink-cmp frontends are gone; virtual text is now the only

@@ -38,7 +38,7 @@ function M.get_text_fn(json)
     return json.choices[1].text
 end
 
-M.complete = function(context, callback)
+M.complete = function(context, callback, on_update)
     local config = require('minuet').config
     local options = vim.deepcopy(config.provider_options.openai_fim_compatible)
 
@@ -50,7 +50,7 @@ M.complete = function(context, callback)
         get_text_fn = options.get_text_fn.no_stream
     end
 
-    base.complete_openai_fim_base(options, get_text_fn, context, callback)
+    base.complete_openai_fim_base(options, get_text_fn, context, callback, on_update)
 end
 
 return M

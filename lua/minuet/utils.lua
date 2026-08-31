@@ -681,6 +681,10 @@ function M.make_curl_args(end_point, headers, data_file)
 
     table.insert(args, '-L')
 
+    -- Flush each response line as it arrives so streamed tokens can be
+    -- rendered without waiting for the whole request to finish.
+    table.insert(args, '--no-buffer')
+
     for k, v in pairs(headers) do
         table.insert(args, '-H')
         table.insert(args, k .. ': ' .. v)

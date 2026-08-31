@@ -70,6 +70,10 @@ end
 ---@field choice? integer
 ---@field shown_choices? table<string, true>
 ---@field last_pos integer[]
+---@field stream? { raw: string, consumed: integer, done: boolean } The completion as a
+-- live character stream: the model appends to `raw` while the user takes from
+-- the front by typing or accepting. The visible suggestion is the unconsumed
+-- remainder.
 
 ---@param ctx minuet.VirtualtextSuggestionContext
 local function reset_ctx(ctx)
@@ -77,6 +81,7 @@ local function reset_ctx(ctx)
     ctx.choice = nil
     ctx.shown_choices = nil
     ctx.last_pos = nil
+    ctx.stream = nil
 end
 
 local function stop_timer()
@@ -89,6 +94,14 @@ end
 
 local function clear_preview()
     api.nvim_buf_del_extmark(0, internal.ns_id, internal.extmark_id)
+end
+
+---Recompute the visible suggestion as the part of the stream the user has
+---not taken yet.
+---@param ctx minuet.VirtualtextSuggestionContext
+local function refresh_stream_suggestion(ctx)
+    ctx.suggestions = ctx.suggestions or {}
+    ctx.suggestions[1] = ctx.stream.raw:sub(ctx.stream.consumed + 1)
 end
 
 ---@param ctx? minuet.VirtualtextSuggestionContext
@@ -203,11 +216,18 @@ local function update_suggestion_on_typing(ctx)
         return false
     end
 
-    for i, suggestion in ipairs(ctx.suggestions) do
-        if suggestion:sub(1, #typed) == typed then
-            ctx.suggestions[i] = suggestion:sub(#typed + 1, -1)
-        else
-            ctx.suggestions[i] = ''
+    if ctx.stream and #ctx.stream.raw > 0 then
+        -- In stream mode the typing advances the stream pointer instead of
+        -- trimming in place: the model keeps appending to the tail.
+        ctx.stream.consumed = ctx.stream.consumed + #typed
+        refresh_stream_suggestion(ctx)
+    else
+        for i, suggestion in ipairs(ctx.suggestions) do
+            if suggestion:sub(1, #typed) == typed then
+                ctx.suggestions[i] = suggestion:sub(#typed + 1, -1)
+            else
+                ctx.suggestions[i] = ''
+            end
         end
     end
 
@@ -231,6 +251,12 @@ local function trigger(bufnr)
     local timestamp = uv.now()
     internal.current_completion_timestamp = timestamp
 
+    -- The completion as a live character stream: the model appends to the raw
+    -- text while the user takes from the front by typing or accepting.
+    local ctx = get_ctx()
+    local stream = { raw = '', consumed = 0, done = false }
+    ctx.stream = stream
+
     provider.complete(context, function(data)
         if timestamp ~= internal.current_completion_timestamp then
             if data and next(data) then
@@ -240,8 +266,21 @@ local function trigger(bufnr)
             return
         end
 
-        data = utils.list_dedup(data or {})
         local ctx = get_ctx()
+
+        if ctx.stream == stream and #stream.raw > 0 then
+            -- The tokens already arrived one by one and were shown as they
+            -- streamed; mark the stream done so the state resets once the user
+            -- has taken the rest.
+            stream.done = true
+            refresh_stream_suggestion(ctx)
+            if #ctx.suggestions[1] == 0 then
+                reset_ctx(ctx)
+            end
+            return
+        end
+
+        data = utils.list_dedup(data or {})
 
         if next(data) then
             ctx.suggestions = data
@@ -251,6 +290,25 @@ local function trigger(bufnr)
             ctx.shown_choices = {}
         end
 
+        update_preview(ctx)
+    end, function(text)
+        -- Streamed tokens: render the growing completion without waiting for
+        -- the request to finish.
+        if timestamp ~= internal.current_completion_timestamp then
+            return
+        end
+        local ctx = get_ctx()
+        if ctx.stream ~= stream then
+            return
+        end
+        stream.raw = stream.raw .. text
+        if not ctx.choice then
+            ctx.choice = 1
+        end
+        if not ctx.shown_choices then
+            ctx.shown_choices = {}
+        end
+        refresh_stream_suggestion(ctx)
         update_preview(ctx)
     end)
 end
@@ -467,7 +525,7 @@ function action.accept_chunk()
     local chunk, remaining = split_chunk(suggestion)
     local lines = vim.split(chunk, '\n', { plain = true })
 
-    if #remaining == 0 then
+    if #remaining == 0 and not (ctx.stream and #ctx.stream.raw > 0 and not ctx.stream.done) then
         reset_ctx(ctx)
     end
 
