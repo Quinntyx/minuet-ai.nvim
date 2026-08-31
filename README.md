@@ -159,6 +159,9 @@ require('minuet').setup {
             accept = '<A-A>',
             -- accept one line
             accept_line = '<A-a>',
+            -- accept one chunk (current identifier plus the special
+            -- characters that follow it)
+            accept_chunk = '<A-c>',
             -- accept n lines (prompts for number)
             -- e.g. "A-z 2 CR" will accept 2 lines
             accept_n_lines = '<A-z>',
@@ -687,6 +690,7 @@ default_config = {
         keymap = {
             accept = nil,
             accept_line = nil,
+            accept_chunk = nil,
             accept_n_lines = nil,
             -- Cycle to next completion item, or manually invoke completion
             next = nil,
@@ -697,6 +701,12 @@ default_config = {
         -- Whether show virtual text suggestion when the completion menu
         -- (nvim-cmp or blink-cmp) is visible.
         show_on_completion_menu = false,
+        -- Show only the remainder of the current line of the completion.
+        -- When the completion starts with a newline, the current line is
+        -- already complete, so show the line below instead. The rest of the
+        -- completion stays available for further acceptance, which lets you
+        -- accept the completion one visible line at a time.
+        display_singleline = false,
     },
     provider = 'codestral',
     -- the maximum total characters of the context before and after the cursor
@@ -1679,6 +1689,9 @@ require('minuet').setup {
     require('minuet.virtualtext').action.accept,
     -- accept by line
     require('minuet.virtualtext').action.accept_line,
+    -- accept one chunk (current identifier plus the special characters that
+    -- follow it)
+    require('minuet.virtualtext').action.accept_chunk,
     -- accept n lines (prompts for number)
     require('minuet.virtualtext').action.accept_n_lines,
     require('minuet.virtualtext').action.next,

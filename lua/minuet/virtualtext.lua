@@ -127,6 +127,13 @@ local function update_preview(ctx)
         return
     end
 
+    if require('minuet').config.virtualtext.display_singleline and #display_lines > 1 then
+        -- Show only the remainder of the current line. When the suggestion
+        -- starts with a newline, the current line is already complete, so
+        -- show the next line of the completion instead.
+        display_lines = { display_lines[1] == '' and display_lines[2] or display_lines[1] }
+    end
+
     local annot = ''
 
     if ctx.suggestions and #ctx.suggestions > 1 then
@@ -287,6 +294,27 @@ end
 
 local action = {}
 
+---Split a suggestion at the next chunk boundary. A chunk is the current
+---identifier (alphanumeric characters and underscores) together with the
+---special characters that follow it, and it stops where the next identifier
+---begins. When the suggestion starts with special characters (for example a
+---newline right after accepting the previous line), they lead into the chunk.
+---@param suggestion string
+---@return string, string The next chunk and the remaining suggestion.
+local function split_chunk(suggestion)
+    local leading = suggestion:match '^([^%w_]+)'
+    local pos = leading and (#leading + 1) or 1
+    local ident = suggestion:match('^[%w_]+', pos)
+    if ident then
+        pos = pos + #ident
+    end
+    local trailing = suggestion:match('^([^%w_]+)', pos)
+    if trailing then
+        pos = pos + #trailing
+    end
+    return suggestion:sub(1, pos - 1), suggestion:sub(pos)
+end
+
 action.next = function()
     local ctx = get_ctx()
 
@@ -394,6 +422,49 @@ end
 
 function action.accept_line()
     action.accept(1)
+end
+
+---Accepts the current suggestion up to the next chunk boundary (the current
+---identifier plus the special characters that follow it). The rest of the
+---suggestion stays available for further acceptance.
+function action.accept_chunk()
+    local ctx = get_ctx()
+
+    local suggestion = get_current_suggestion(ctx)
+    if not suggestion or #suggestion == 0 then
+        return
+    end
+
+    local chunk, remaining = split_chunk(suggestion)
+    local lines = vim.split(chunk, '\n', { plain = true })
+
+    if #remaining == 0 then
+        reset_ctx(ctx)
+    end
+
+    clear_preview()
+
+    local cursor = api.nvim_win_get_cursor(0)
+    local line, col = cursor[1] - 1, cursor[2]
+
+    if vim.fn.pumvisible() == 1 then
+        -- Accepting Minuet completion while the pum is open is temporary; when
+        -- the user closes the pum, Vim restores the buffer state and removes
+        -- Minuet's completion text. Therefore we need to close the pum before
+        -- accepting.
+        api.nvim_feedkeys(api.nvim_replace_termcodes('<C-e>', true, true, true), 'n', true)
+    end
+
+    vim.schedule(function()
+        api.nvim_buf_set_text(0, line, col, line, col, lines)
+        local new_col = #lines[#lines]
+        -- For single-line chunks, adjust the column position by adding the
+        -- current column offset
+        if #lines == 1 then
+            new_col = new_col + col
+        end
+        api.nvim_win_set_cursor(0, { line + #lines, new_col })
+    end)
 end
 
 function action.dismiss()
@@ -534,6 +605,13 @@ local function set_keymaps(keymap)
     if keymap.accept_line then
         vim.keymap.set('i', keymap.accept_line, action.accept_line, {
             desc = '[minuet.virtualtext] accept suggestion (line)',
+            silent = true,
+        })
+    end
+
+    if keymap.accept_chunk then
+        vim.keymap.set('i', keymap.accept_chunk, action.accept_chunk, {
+            desc = '[minuet.virtualtext] accept suggestion (chunk)',
             silent = true,
         })
     end

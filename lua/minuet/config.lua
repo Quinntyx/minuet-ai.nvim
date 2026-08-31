@@ -238,6 +238,9 @@ local M = {
         keymap = {
             accept = nil,
             accept_line = nil,
+            -- accept one chunk (current identifier plus the special
+            -- characters that follow it)
+            accept_chunk = nil,
             -- accept n lines (prompts for number)
             accept_n_lines = nil,
             -- Cycle to next completion item, or manually invoke completion
@@ -249,6 +252,12 @@ local M = {
         -- Whether show virtual text suggestion when the completion menu
         -- (nvim-cmp or blink-cmp) is visible.
         show_on_completion_menu = false,
+        -- Show only the remainder of the current line of the completion.
+        -- When the completion starts with a newline, the current line is
+        -- already complete, so show the line below instead. The rest of the
+        -- completion stays available for further acceptance, which lets you
+        -- accept the completion one visible line at a time.
+        display_singleline = false,
     },
     provider = 'codestral',
     -- the maximum total characters of the context before and after the cursor
