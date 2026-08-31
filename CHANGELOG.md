@@ -9,7 +9,10 @@
 - Virtual Text: The new `accept_chunk` action accepts the completion one chunk
   at a time, where a chunk is the current identifier plus the special
   characters that follow it (for example `foo.bar(a, b).baz(c)` is accepted as
-  `foo.` `bar(` `a, ` `b).` `baz(` `c)`).
+  `foo.` `bar(` `a, ` `b).` `baz(` `c)`). A chunk never crosses a newline
+  unless the newline is the first character of the completion, matching what
+  the `display_singleline` view shows; a run like `)\n.` is accepted as
+  `)` and then `\n.`.
 
 # Version 0.10.0 (2026-07-31)
 
