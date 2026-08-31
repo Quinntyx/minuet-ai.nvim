@@ -128,10 +128,14 @@ local function update_preview(ctx)
     end
 
     if require('minuet').config.virtualtext.display_singleline and #display_lines > 1 then
-        -- Show only the remainder of the current line. When the suggestion
-        -- starts with a newline, the current line is already complete, so
-        -- show the next line of the completion instead.
-        display_lines = { display_lines[1] == '' and display_lines[2] or display_lines[1] }
+        if display_lines[1] ~= '' then
+            -- Show only the remainder of the current line.
+            display_lines = { display_lines[1] }
+        end
+        -- When the completion starts with a newline, the current line is
+        -- already complete: keep the empty leading line so the following
+        -- lines render below the cursor instead of inline to its right,
+        -- matching where accepting them actually puts them.
     end
 
     local annot = ''
@@ -156,7 +160,9 @@ local function update_preview(ctx)
         end
 
         local last_line = #display_lines - 1
-        extmark.virt_lines[last_line][1][1] = extmark.virt_lines[last_line][1][1] .. ' ' .. annot
+        if #annot > 0 then
+            extmark.virt_lines[last_line][1][1] = extmark.virt_lines[last_line][1][1] .. ' ' .. annot
+        end
     elseif #annot > 0 then
         extmark.virt_text[1][1] = extmark.virt_text[1][1] .. ' ' .. annot
     end

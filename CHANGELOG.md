@@ -3,9 +3,10 @@
 ## Features
 
 - Virtual Text: The new `virtualtext.display_singleline` option shows only the
-  remainder of the current line of the completion (or the next line when the
-  completion starts with a newline), keeping the rest cached so it can still
-  be accepted line by line.
+  remainder of the current line of the completion. When the completion
+  starts with a newline, the next line is shown below the cursor instead of
+  inline to its right, matching where accepting it actually puts it; the
+  rest stays cached so it can still be accepted line by line.
 - Virtual Text: The new `accept_chunk` action accepts the completion one chunk
   at a time, where a chunk is the current identifier plus the special
   characters that follow it (for example `foo.bar(a, b).baz(c)` is accepted as
