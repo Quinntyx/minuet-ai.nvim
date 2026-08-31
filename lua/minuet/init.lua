@@ -36,7 +36,6 @@ function M.setup(config)
 
     M.config = vim.tbl_deep_extend('force', default_config, config or {})
 
-    require('minuet.duet').setup()
     require('minuet.lsp').setup()
     require 'minuet.deprecate'
 end
@@ -153,7 +152,6 @@ local function minuet_complete(arglead, cmdline, _)
     end
 
     local completions = {
-        duet = { predict = true, apply = true, dismiss = true, enable = true, disable = true, toggle = true },
         virtualtext = { enable = true, disable = true, toggle = true },
         lsp = {
             attach = true,
@@ -230,16 +228,6 @@ vim.api.nvim_create_user_command('Minuet', function(args)
     }
 
     actions.lsp = require('minuet.lsp').actions
-
-    local duet_action = require('minuet.duet').action
-    actions.duet = {
-        predict = duet_action.predict,
-        apply = duet_action.apply,
-        dismiss = duet_action.dismiss,
-        enable = duet_action.enable_auto_trigger,
-        disable = duet_action.disable_auto_trigger,
-        toggle = duet_action.toggle_auto_trigger,
-    }
 
     actions.change_provider = setmetatable({}, {
         __index = function(_, key)

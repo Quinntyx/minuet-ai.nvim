@@ -32,20 +32,12 @@
   - [`Minuet change_provider`, `Minuet change_model`](#minuet-change_provider-minuet-change_model)
   - [`Minuet change_preset`](#minuet-change_preset)
   - [`Minuet virtualtext`](#minuet-virtualtext)
-  - [`Minuet duet`](#minuet-duet)
   - [`Minuet lsp`](#minuet-lsp)
-- [Duet (Next Edit Prediction)](#duet-next-edit-prediction)
-  - [Auto Trigger](#auto-trigger)
-  - [Recent Edits](#recent-edits)
-  - [TODO](#todo)
-  - [Default Config](#default-config)
 - [API](#api)
   - [Virtual Text](#virtual-text)
-  - [Duet](#duet)
   - [Lualine](#lualine)
   - [Minuet Event](#minuet-event)
     - [Standard Completion Events](#standard-completion-events)
-    - [Duet Events](#duet-events)
     - [Event Data](#event-data)
 - [FAQ](#faq)
   - [Integration with `lazyvim`](#integration-with-lazyvim)
@@ -80,8 +72,7 @@ Just as dancers move during a minuet.
 - When your typed text matches the start of a suggestion, Minuet keeps the
   completion in sync of your typed text rather than discarding it, to reduce
   unnecessary LLM requests and conserving resources.
-- Support next-edit prediction (NES) via `Minuet duet` commands. This feature
-  is highly experimental.
+
 
 
 **With builtin completion frontend** (requires nvim 0.11+):
@@ -94,13 +85,8 @@ Just as dancers move during a minuet.
 
 https://github.com/user-attachments/assets/e0c4f2bd-0361-45b4-8eb4-0f49356bd7d9
 
-**With duet (next-edit prediction)**:
-
-https://github.com/user-attachments/assets/b98699d5-b81d-4061-a1b3-d6f581c6b9b0
-
 <!-- The link above is a showcase video for the virtual text feature, hosted -->
 <!-- externally on GitHub. -->
-
 # Requirements
 
 - Neovim 0.10+.
@@ -1268,18 +1254,6 @@ Enable or disable the automatic display of `virtual-text` completion in the
 Example usage: `Minuet virtualtext toggle`, `Minuet virtualtext enable`,
 `Minuet virtualtext disable`.
 
-## `Minuet duet`
-
-The Minuet duet command provides next-edit prediction controls:
-
-- `:Minuet duet predict`: Request an NES prediction for the current editable
-  region and show it as a preview.
-- `:Minuet duet apply`: Apply the current duet prediction.
-- `:Minuet duet dismiss`: Dismiss the current duet prediction preview.
-- `:Minuet duet enable`: Enable automatic duet prediction in the **current buffer**.
-- `:Minuet duet disable`: Disable automatic duet prediction in the **current buffer**.
-- `:Minuet duet toggle`: Toggle automatic duet prediction in the **current buffer**.
-
 ## `Minuet lsp`
 
 The Minuet LSP command provides commands for managing the in-process LSP server:
@@ -1290,261 +1264,6 @@ The Minuet LSP command provides commands for managing the in-process LSP server:
 - `:Minuet lsp completion disable_auto_trigger`: Disable auto-triggered `vim.lsp.completion` for the **current buffer**.
 - `:Minuet lsp inline_completion enable_auto_trigger`: Enable `vim.lsp.inline_completion` auto-triggering for the **current buffer**.
 - `:Minuet lsp inline_completion disable_auto_trigger`: Disable `vim.lsp.inline_completion` auto-triggering for the **current buffer**.
-
-# Duet (Next Edit Prediction)
-
-`Minuet duet` is Minuet's highly experimental next-edit prediction (NES)
-feature.
-
-Basic usage is manual. Bind the duet commands to your preferred keymaps, then:
-
-1. Trigger `:Minuet duet predict` to request a prediction for the current edit.
-2. Review the preview rendered in the buffer.
-3. Apply it with `:Minuet duet apply` or discard it with
-   `:Minuet duet dismiss`.
-
-Example keymaps:
-
-```lua
-vim.keymap.set('n', '<leader>mp', '<cmd>Minuet duet predict<cr>', { desc = 'Minuet duet predict' })
-vim.keymap.set('n', '<leader>ma', '<cmd>Minuet duet apply<cr>', { desc = 'Minuet duet apply' })
-vim.keymap.set('n', '<leader>md', '<cmd>Minuet duet dismiss<cr>', { desc = 'Minuet duet dismiss' })
-vim.keymap.set('i', '<A-z>', '<cmd>Minuet duet predict<cr>', { desc = 'Minuet duet predict' })
-vim.keymap.set('i', '<A-a>', '<cmd>Minuet duet apply<cr>', { desc = 'Minuet duet apply' })
-vim.keymap.set('i', '<A-x>', '<cmd>Minuet duet dismiss<cr>', { desc = 'Minuet duet dismiss' })
-```
-
-The recommended model at the moment is `gemini-3-flash-preview`.
-
-```lua
-require('minuet').setup {
-    duet = {
-        provider = 'gemini',
-        provider_options = {
-            gemini = {
-                model = 'gemini-3-flash-preview',
-                optional = {
-                    generationConfig = {
-                        thinkingConfig = {
-                            -- Disable thinking is recommended
-                            thinkingLevel = 'minimal',
-                        },
-                    },
-                },
-            },
-            openai_compatible = {
-                model = 'google/gemini-3.1-flash-lite',
-                optional = {
-                    -- Disable thinking is recommended.
-                    reasoning_effort = 'none',
-                    -- prioritize throughput for faster completion
-                    provider = {
-                        sort = 'throughput',
-                    },
-                },
-            },
-        },
-    },
-}
-```
-
-This feature is highly experimental:
-
-- It only targets general-purpose LLMs rather than NES-specialized models, as I
-  lack local GPU resources for testing.
-- Comparable small models from competitors of Google—`claude-haiku-4.5` and
-  `gpt-5.4-mini`—perform poorly.
-
-It is recommended to configure the thinking levels of the models; refer to the
-[provider sections](#providers) for guidance on managing thinking settings for
-each provider.
-
-Avoid setting a small `max_tokens` or `max_completion_tokens` limit for duet
-requests. Duet expects the model to return the complete rewritten editable
-region, including the cursor marker; if the response is truncated, the parser
-will reject it. Leave the limit unset when the provider allows that, or set it
-large enough to cover the full rewritten region.
-
-## Auto Trigger
-
-```lua
-require('minuet').setup {
-    duet = {
-        auto_trigger = {
-            auto_trigger_ft = { 'lua', 'python' },
-        },
-    },
-}
-```
-
-To keep automatic predictions out of specific buffers, set
-`auto_trigger.enable_predicates` to a list of functions. A prediction is
-triggered only while every predicate returns true. Since these predicates
-execute before each request, ensure they are cheap.
-
-```lua
-auto_trigger = {
-    enable_predicates = {
-        function()
-            local name = vim.api.nvim_buf_get_name(vim.api.nvim_get_current_buf())
-            return vim.fn.fnamemodify(name, ':t') ~= '.env'
-        end,
-    },
-},
-```
-
-**Example: inline completion in insert mode, duet prediction in normal mode**
-
-```lua
-require('minuet').setup {
-    duet = {
-        auto_trigger = {
-            auto_trigger_ft = { 'lua', 'python' },
-            enable_predicates = {
-                function()
-                    -- Fire duet prediction only in normal mode; inline
-                    -- completion happens in insert mode.
-                    return vim.fn.mode() == 'n'
-                end,
-            },
-        },
-    },
-}
-```
-
-## Recent Edits
-
-Duet silently records your recent edits in the background and includes them in
-the prompt, providing the model with the signal needed to predict the next
-edit: what you just changed. `recent_edits.enabled` controls when the recorder
-runs:
-
-- `'lazy'` (default): recording starts at your first duet prediction, so users
-who only use inline completion runs no background overhead. Edits made before
-the first prediction are not recorded, so the first prediction of a session has
-an empty edit history.
-- `true`: recording starts at plugin setup, so even the first prediction
-carries the session's edit history.
-- `false`: the recorder is disabled entirely.
-
-To prevent sensitive buffers from being tracked in the edit history, configure
-`recent_edits.enable_predicates` with a list of functions, each receiving a
-buffer number. A buffer is only tracked while all predicates return true. If a
-buffer is rejected, it is never snapshotted to disk. By default, the list
-rejects dotenv files (`.env`, `.env.*`). Because predicates run on every
-trackability check, ensure they are highly efficient.
-
-Example:
-
-```lua
-recent_edits = {
-    enable_predicates = {
-        function(bufnr)
-            local name = vim.api.nvim_buf_get_name(bufnr)
-            return vim.fn.fnamemodify(name, ':t') ~= '.env'
-        end,
-    },
-},
-```
-
-## TODO
-
-- [x] Implement a proper diff mechanism to include recent edit changes in prompts.
-- [ ] Add support for specialized NES models (Zeta, Sweep).
-- [ ] Integrate with Inception's hosted API.
-- [x] Implement automatically triggered duet prediction.
-
-## Default Config
-
-```lua
-require('minuet').setup {
-    duet = {
-        provider = 'gemini', -- Provider used by `:Minuet duet predict`.
-        request_timeout = 15, -- Timeout in seconds for a single duet request.
-        auto_trigger = {
-            debounce = 600, -- Milliseconds of idle after a text change before an automatic prediction fires.
-            flush_timeout = 50, -- Max milliseconds an automatic prediction waits for in-flight recent-edit diffs; smaller than recent_edits.flush_timeout (used by manual prediction) so automatic triggering never stalls the editor for long.
-            auto_trigger_ft = {}, -- Filetypes where automatic duet prediction is enabled; an empty list disables automatic prediction.
-            auto_trigger_ignore_ft = {}, -- Filetypes excluded from automatic prediction, useful when auto_trigger_ft = { '*' }.
-            enable_predicates = {}, -- Predicates run before an automatic prediction fires; a prediction is made only while all of them return true.
-        },
-        editable_region = {
-            lines_before = 8, -- Number of editable lines included before the cursor.
-            lines_after = 15, -- Number of editable lines included after the cursor.
-            before_region_filter_length = 30, -- Trim duplicated text from the start of the model output when it repeats non-editable text before the region.
-            after_region_filter_length = 30, -- Trim duplicated text from the end of the model output when it repeats non-editable text after the region.
-        },
-        non_editable_region = {
-            context_window = 40000, -- Maximum characters of non-editable context included around the editable region.
-            context_ratio = 0.75, -- Ratio of non-editable context before vs. after the editable region when truncation is needed.
-        },
-        recent_edits = {
-            enabled = 'lazy', -- 'lazy' starts the recorder on the first duet prediction, true starts it at plugin setup, false disables it entirely
-            debounce = 1500, -- Milliseconds of typing pause before an edit burst is recorded as one event.
-            max_events = 15, -- Maximum number of edit events kept across all buffers.
-            max_total_chars = 8000, -- Total character budget of the formatted edit history sent in prompts.
-            diff_context_lines = 3, -- Context lines around each hunk in the unified diff.
-            max_buffer_size = 1000000, -- Buffers larger than this (bytes) are not tracked.
-            max_event_chars = 2000, -- A single edit burst whose diff exceeds this is truncated to the leading whole hunks that fit (dropped if not even the first hunk fits).
-            diff_program = 'diff', -- External diff program used to compute edit diffs, as a command name or a command list. Defaults to 'diff', or 'git' diff on Windows when `diff` is not available.
-            flush_timeout = 200, -- Max milliseconds a prediction waits for in-flight diffs before proceeding with slightly stale history.
-            enable_predicates = { ... }, -- Per-buffer predicates called with a buffer number; a buffer is tracked only while all return true. Defaults to rejecting dotenv files (.env, .env.*); overriding replaces that default.
-        },
-        markers = {
-            editable_region_start = '<editable_region>', -- Marker that wraps the start of the editable region in prompts and responses.
-            editable_region_end = '</editable_region>', -- Marker that wraps the end of the editable region in prompts and responses.
-            cursor_position = '<cursor_position/>', -- Marker the model must preserve exactly once to indicate the final cursor position.
-        },
-        preview = {
-            cursor = '', -- Virtual marker shown at the predicted cursor location in the preview.
-        },
-        provider_options = {
-            openai = {
-                model = 'gpt-5.6-luna', -- Default OpenAI model for duet requests.
-                api_key = 'OPENAI_API_KEY', -- Environment variable name, or a function that returns the API key.
-                end_point = 'https://api.openai.com/v1/chat/completions', -- OpenAI chat completions endpoint.
-                system = { ... }, -- Duet system prompt config; keep the default unless you need a custom rewrite prompt.
-                few_shots = { ... }, -- Example user/assistant turns used to steer the rewrite.
-                chat_input = { ... }, -- Template that serializes editable and non-editable buffer regions.
-                optional = {}, -- Extra request body fields passed through to the OpenAI API.
-                transform = {}, -- Optional endpoint/header/body transforms applied before sending the request.
-            },
-            claude = {
-                model = 'claude-haiku-4-5',
-                api_key = 'ANTHROPIC_API_KEY',
-                end_point = 'https://api.anthropic.com/v1/messages',
-                system = { ... },
-                few_shots = { ... },
-                chat_input = { ... },
-                max_tokens = 8192,
-                optional = {},
-                transform = {},
-            },
-            gemini = {
-                model = 'gemini-3-flash-preview', -- Recommended duet model at the moment.
-                api_key = 'GEMINI_API_KEY',
-                end_point = 'https://generativelanguage.googleapis.com/v1beta/models',
-                system = { ... },
-                few_shots = { ... },
-                chat_input = { ... },
-                optional = {},
-                transform = {},
-            },
-            openai_compatible = {
-                model = 'google/gemini-3.1-flash-lite',
-                api_key = 'OPENROUTER_API_KEY',
-                end_point = 'https://openrouter.ai/api/v1/chat/completions',
-                name = 'Openrouter',
-                system = { ... },
-                few_shots = { ... },
-                chat_input = { ... },
-                optional = {},
-                transform = {},
-            },
-        },
-    },
-}
-```
 
 # API
 
@@ -1568,24 +1287,6 @@ require('minuet').setup {
     require('minuet.virtualtext').action.dismiss,
     -- whether the virtual text is visible in current buffer
     require('minuet.virtualtext').action.is_visible,
-}
-```
-
-## Duet
-
-The duet module provides functions to programmatically control duet prediction:
-
-```lua
-{
-    require('minuet.duet').action.predict,
-    require('minuet.duet').action.apply,
-    require('minuet.duet').action.dismiss,
-    -- Check if a duet preview is currently visible in the current buffer
-    require('minuet.duet').action.is_visible,
-    -- Control automatic duet prediction in the current buffer
-    require('minuet.duet').action.enable_auto_trigger,
-    require('minuet.duet').action.disable_auto_trigger,
-    require('minuet.duet').action.toggle_auto_trigger,
 }
 ```
 
@@ -1635,13 +1336,6 @@ require('lualine').setup {
 - **MinuetRequestStarted**: Triggered immediately after the completion request
   is dispatched, signaling that the request is in progress.
 - **MinuetRequestFinished**: Triggered upon completion of the request.
-
-### Duet Events
-
-- **MinuetDuetRequestStartedPre**: Triggered before a duet request is initiated.
-- **MinuetDuetRequestStarted**: Triggered immediately after the duet request
-  is dispatched.
-- **MinuetDuetRequestFinished**: Triggered upon completion of the duet request.
 
 ### Event Data
 

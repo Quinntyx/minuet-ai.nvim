@@ -423,7 +423,6 @@ M.provider_options = {
     },
 }
 
-M.duet = require 'minuet.duet.config'
 
 M.presets = {}
 

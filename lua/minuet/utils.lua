@@ -1,24 +1,5 @@
 local M = {}
 
-function M.replace_string_literal(text, needle, replacement)
-    local result = {}
-    local start_index = 1
-
-    while true do
-        local match_start, match_end = text:find(needle, start_index, true)
-        if not match_start then
-            table.insert(result, text:sub(start_index))
-            break
-        end
-
-        table.insert(result, text:sub(start_index, match_start - 1))
-        table.insert(result, replacement)
-        start_index = match_end + 1
-    end
-
-    return table.concat(result)
-end
-
 function M.notify(msg, minuet_level, vim_level, opts)
     local config = require('minuet').config
     local notify_levels = {

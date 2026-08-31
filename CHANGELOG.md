@@ -38,6 +38,8 @@
   removed with them.
 - The `n_completions` option is gone: virtual text can only show one
   completion at a time, so exactly one candidate is always generated.
+- The duet (next-edit prediction) feature is gone, including its backends,
+  preview, edits tracking, `Minuet duet` commands, and events.
 
 # Version 0.10.0 (2026-07-31)
 
