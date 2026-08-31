@@ -15,9 +15,9 @@ function M.ensure_runtime()
     }, ';')
 end
 
-function M.reset_minuet_modules()
+function M.reset_harmonize_modules()
     for name, _ in pairs(package.loaded) do
-        if name == 'minuet' or vim.startswith(name, 'minuet.') then
+        if name == 'harmonize' or vim.startswith(name, 'harmonize.') then
             package.loaded[name] = nil
         end
     end
@@ -25,9 +25,9 @@ end
 
 function M.setup_root_config(overrides)
     M.ensure_runtime()
-    M.reset_minuet_modules()
+    M.reset_harmonize_modules()
 
-    local config = vim.deepcopy(require 'minuet.config')
+    local config = vim.deepcopy(require 'harmonize.config')
     local root = {
         config = vim.tbl_deep_extend('force', config, {
             notify = false,
@@ -35,7 +35,7 @@ function M.setup_root_config(overrides)
         }, overrides or {}),
     }
 
-    package.loaded['minuet'] = root
+    package.loaded['harmonize'] = root
     return root
 end
 

@@ -108,7 +108,7 @@ local n_completion_template = '8. Provide at most %d completion items.'
 local default_system_template = '{{{prompt}}}\n{{{guidelines}}}\n{{{n_completion_template}}}'
 
 local default_fim_prompt = function(context_before_cursor, _, _)
-    local utils = require 'minuet.utils'
+    local utils = require 'harmonize.utils'
     local language = utils.add_language_comment()
     local tab = utils.add_tab_comment()
     context_before_cursor = language .. '\n' .. tab .. '\n' .. context_before_cursor
@@ -121,39 +121,39 @@ local default_fim_suffix = function(_, context_after_cursor, _)
 end
 
 local function default_after_cursor_filter_length()
-    local config = require('minuet').config
+    local config = require('harmonize').config
     return (config.provider == 'codestral' or config.provider == 'openai_fim_compatible') and 0 or 15
 end
 
 local function default_before_cursor_filter_length()
-    local config = require('minuet').config
+    local config = require('harmonize').config
     return (config.provider == 'codestral' or config.provider == 'openai_fim_compatible') and 0 or 2
 end
 
----@class minuet.ChatInputExtraInfo
+---@class harmonize.ChatInputExtraInfo
 ---@field is_incomplete_before boolean
 ---@field is_incomplete_after boolean
 
----@alias minuet.ChatInputFunction fun(context_before_cursor: string, context_after_cursor: string, opts: minuet.ChatInputExtraInfo): string
----@alias minuet.FIMTemplateFunction minuet.ChatInputFunction
+---@alias harmonize.ChatInputFunction fun(context_before_cursor: string, context_after_cursor: string, opts: harmonize.ChatInputExtraInfo): string
+---@alias harmonize.FIMTemplateFunction harmonize.ChatInputFunction
 
 --- Configuration for formatting chat input to the LLM
----@class minuet.ChatInput
+---@class harmonize.ChatInput
 ---@field template string Template string with placeholders for context parts
----@field language minuet.ChatInputFunction function to add language comment based on filetype
----@field tab minuet.ChatInputFunction function to add indentation style comment
----@field context_before_cursor minuet.ChatInputFunction function to process text before cursor
----@field context_after_cursor minuet.ChatInputFunction function to process text after cursor
+---@field language harmonize.ChatInputFunction function to add language comment based on filetype
+---@field tab harmonize.ChatInputFunction function to add indentation style comment
+---@field context_before_cursor harmonize.ChatInputFunction function to process text before cursor
+---@field context_after_cursor harmonize.ChatInputFunction function to process text after cursor
 
----@type minuet.ChatInput
+---@type harmonize.ChatInput
 local default_chat_input = {
     template = '{{{language}}}\n{{{tab}}}\n<contextAfterCursor>\n{{{context_after_cursor}}}\n<contextBeforeCursor>\n{{{context_before_cursor}}}<cursorPosition>',
     language = function(_, _, _)
-        local utils = require 'minuet.utils'
+        local utils = require 'harmonize.utils'
         return utils.add_language_comment()
     end,
     tab = function(_, _, _)
-        local utils = require 'minuet.utils'
+        local utils = require 'harmonize.utils'
         return utils.add_tab_comment()
     end,
     context_before_cursor = function(context_before_cursor, _, opts)
@@ -174,7 +174,7 @@ local default_chat_input = {
     end,
 }
 
----@type minuet.ChatInput
+---@type harmonize.ChatInput
 local default_chat_input_prefix_first = vim.deepcopy(default_chat_input)
 default_chat_input_prefix_first.template =
     '{{{language}}}\n{{{tab}}}\n<contextBeforeCursor>\n{{{context_before_cursor}}}<cursorPosition>\n<contextAfterCursor>\n{{{context_after_cursor}}}'
@@ -194,7 +194,7 @@ local M = {
             accept_line = nil,
             -- accept one chunk (current identifier plus the special
             -- characters that follow it)
-            accept_chunk = nil,
+            accept_chunk = '<Tab>',
             -- accept n lines (prompts for number)
             accept_n_lines = nil,
             -- Cycle to next completion item, or manually invoke completion
@@ -211,9 +211,9 @@ local M = {
         -- already complete, so show the line below instead. The rest of the
         -- completion stays available for further acceptance, which lets you
         -- accept the completion one visible line at a time.
-        display_singleline = false,
+        display_singleline = true,
     },
-    provider = 'codestral',
+    provider = 'openai_fim_compatible',
     -- the maximum total characters of the context before and after the cursor
     -- 16000 characters typically equate to approximately 4,000 tokens for
     -- LLMs.
@@ -287,11 +287,11 @@ M.default_few_shots = default_few_shots
 M.default_few_shots_prefix_first = default_few_shots_prefix_first
 
 --- Configuration for FIM template
----@class minuet.FIMTemplate
----@field prompt minuet.FIMTemplateFunction
----@field suffix minuet.FIMTemplateFunction | boolean
+---@class harmonize.FIMTemplate
+---@field prompt harmonize.FIMTemplateFunction
+---@field suffix harmonize.FIMTemplateFunction | boolean
 
----@type minuet.FIMTemplate
+---@type harmonize.FIMTemplate
 M.default_fim_template = {
     prompt = default_fim_prompt,
     suffix = default_fim_suffix,
@@ -392,11 +392,11 @@ M.provider_options = {
 
 M.presets = {}
 
--- **List** of functions to execute. If any function returns `false`, Minuet
+-- **List** of functions to execute. If any function returns `false`, Harmonize
 -- will not trigger auto-completion. Manual completion can still be invoked,
 -- even if these functions evaluate to `false`, when using virtual text
 -- (excluding LSP).
--- Note that this is called each time Minuet attempts to trigger
+-- Note that this is called each time Harmonize attempts to trigger
 -- auto-completion, so ensure the functions in this list are highly efficient.
 ---@type (fun(): boolean)[]
 M.enable_predicates = {}

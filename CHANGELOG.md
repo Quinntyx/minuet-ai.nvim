@@ -17,8 +17,20 @@
   been typed, the special characters that follow it end that chunk: after
   typing the `r` of `r#my_var_name`, the next chunk is `#` and only after
   that `my_var_name`.
-  typing the `r` of `r#my_var_name`, the next chunk is `#` and only after
-  that `my_var_name`.
+
+## Renamed
+
+- The plugin is now called harmonize.nvim: the module is
+  `require('harmonize')`, the user command is `:Harmonize`, and the
+  `HarmonizeVirtualText` highlight group and `HarmonizeRequest*` events use
+  the new prefix. The repository name will follow.
+
+## Defaults
+
+- The default provider is now `openai_fim_compatible`, Tab accepts the next
+  chunk (`virtualtext.keymap.accept_chunk = '<Tab>'`), and
+  `virtualtext.display_singleline` defaults to true: install, configure an
+  endpoint, and Tab completes out of the box.
 
 ## Streaming
 

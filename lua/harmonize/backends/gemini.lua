@@ -1,10 +1,10 @@
-local utils = require 'minuet.utils'
-local common = require 'minuet.backends.common'
+local utils = require 'harmonize.utils'
+local common = require 'harmonize.backends.common'
 
 local M = {}
 
 M.is_available = function()
-    local config = require('minuet').config
+    local config = require('harmonize').config
     return utils.get_api_key(config.provider_options.gemini.api_key) and true or false
 end
 
@@ -41,7 +41,7 @@ function M.transform_openai_chat_to_gemini_chat(chat)
 end
 
 local function make_request_data()
-    local config = require('minuet').config
+    local config = require('harmonize').config
     local options = vim.deepcopy(config.provider_options.gemini)
 
     local few_shots = utils.get_or_eval_value(options.few_shots)
@@ -65,7 +65,7 @@ local function make_request_data()
 end
 
 function M.complete(context, callback)
-    local config = require('minuet').config
+    local config = require('harmonize').config
     common.terminate_all_jobs()
 
     local options, data = make_request_data()
@@ -100,7 +100,7 @@ function M.complete(context, callback)
     local provider_name = 'Gemini'
     local timestamp = os.time()
 
-    utils.run_event('MinuetRequestStartedPre', {
+    utils.run_event('HarmonizeRequestStartedPre', {
         provider = provider_name,
         name = provider_name,
         model = options.model,
@@ -110,7 +110,7 @@ function M.complete(context, callback)
 
     local new_job = common.start_job(config.curl_cmd, args, {
         on_exit = function(_, result)
-            utils.run_event('MinuetRequestFinished', {
+            utils.run_event('HarmonizeRequestFinished', {
                 provider = provider_name,
                 name = provider_name,
                 model = options.model,
@@ -141,7 +141,7 @@ function M.complete(context, callback)
         end,
         on_spawn_error = function()
             vim.uv.fs_unlink(data_file)
-            utils.run_event('MinuetRequestFinished', {
+            utils.run_event('HarmonizeRequestFinished', {
                 provider = provider_name,
                 name = provider_name,
                 model = options.model,
@@ -157,7 +157,7 @@ function M.complete(context, callback)
         return
     end
 
-    utils.run_event('MinuetRequestStarted', {
+    utils.run_event('HarmonizeRequestStarted', {
         provider = provider_name,
         name = provider_name,
         model = options.model,

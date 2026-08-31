@@ -1,26 +1,26 @@
 local M = {}
 
 function M.setup(config)
-    local default_config = require 'minuet.config'
+    local default_config = require 'harmonize.config'
 
     M.presets = config.presets or {}
     M.presets.original = config
 
     if config.enabled then
-        vim.deprecate('minuet.config.enabled', 'minuet.config.enable_predicates', 'next release', 'minuet', false)
+        vim.deprecate('harmonize.config.enabled', 'harmonize.config.enable_predicates', 'next release', 'harmonize', false)
         config.enable_predicates = config.enable_predicates or config.enabled
     end
 
     config.presets = nil
 
-    config.presets = nil
-
     M.config = vim.tbl_deep_extend('force', default_config, config or {})
+
+    require('harmonize.virtualtext').setup()
 end
 
 
 local function complete_change_model_options()
-    local modelcard = require 'minuet.modelcard'
+    local modelcard = require 'harmonize.modelcard'
     local choices = {}
 
     -- Build the list of available models
@@ -47,7 +47,7 @@ end
 
 function M.change_model(provider_model)
     if not M.config then
-        vim.notify 'Minuet config is not set up yet, please call the setup function firstly.'
+        vim.notify 'Harmonize config is not set up yet, please call the setup function firstly.'
         return
     end
 
@@ -76,7 +76,7 @@ function M.change_model(provider_model)
 
     if not M.config.provider_options[provider] then
         vim.notify(
-            'The provider is not supported, please refer to minuet.nvim document for more information.',
+            'The provider is not supported, please refer to harmonize.nvim document for more information.',
             vim.log.levels.ERROR
         )
         return
@@ -84,30 +84,30 @@ function M.change_model(provider_model)
 
     M.config.provider = provider
     M.config.provider_options[provider].model = model
-    vim.notify(string.format('Minuet model changed to: %s (%s)', model, provider), vim.log.levels.INFO)
+    vim.notify(string.format('Harmonize model changed to: %s (%s)', model, provider), vim.log.levels.INFO)
 end
 
 function M.change_provider(provider)
     if not M.config then
-        vim.notify 'Minuet config is not set up yet, please call the setup function firstly.'
+        vim.notify 'Harmonize config is not set up yet, please call the setup function firstly.'
         return
     end
 
     if not M.config.provider_options[provider] then
         vim.notify(
-            'The provider is not supported, please refer to minuet.nvim document for more information.',
+            'The provider is not supported, please refer to harmonize.nvim document for more information.',
             vim.log.levels.ERROR
         )
         return
     end
 
     M.config.provider = provider
-    vim.notify('Minuet Provider changed to: ' .. provider, vim.log.levels.INFO)
+    vim.notify('Harmonize Provider changed to: ' .. provider, vim.log.levels.INFO)
 end
 
 function M.change_preset(preset)
     if not M.config then
-        vim.notify 'Minuet config is not set up yet, please call the setup function firstly.'
+        vim.notify 'Harmonize config is not set up yet, please call the setup function firstly.'
         return
     end
 
@@ -120,12 +120,12 @@ function M.change_preset(preset)
 
     -- deep extend the config with preset_config
     M.config = vim.tbl_deep_extend('force', M.config, preset_config)
-    vim.notify('Minuet Preset changed to: ' .. preset, vim.log.levels.INFO)
+    vim.notify('Harmonize Preset changed to: ' .. preset, vim.log.levels.INFO)
 end
 
-local function minuet_complete(arglead, cmdline, _)
+local function harmonize_complete(arglead, cmdline, _)
     if not M.config then
-        vim.notify 'Minuet config is not set up yet, please call the setup function firstly.'
+        vim.notify 'Harmonize config is not set up yet, please call the setup function firstly.'
         return
     end
 
@@ -182,9 +182,9 @@ local function minuet_complete(arglead, cmdline, _)
     return {}
 end
 
-vim.api.nvim_create_user_command('Minuet', function(args)
+vim.api.nvim_create_user_command('Harmonize', function(args)
     if not M.config then
-        vim.notify 'Minuet config is not set up yet, please call the setup function firstly.'
+        vim.notify 'Harmonize config is not set up yet, please call the setup function firstly.'
         return
     end
 
@@ -194,9 +194,9 @@ vim.api.nvim_create_user_command('Minuet', function(args)
 
 
     actions.virtualtext = {
-        enable = require('minuet.virtualtext').action.enable_auto_trigger,
-        disable = require('minuet.virtualtext').action.disable_auto_trigger,
-        toggle = require('minuet.virtualtext').action.toggle_auto_trigger,
+        enable = require('harmonize.virtualtext').action.enable_auto_trigger,
+        disable = require('harmonize.virtualtext').action.disable_auto_trigger,
+        toggle = require('harmonize.virtualtext').action.toggle_auto_trigger,
     }
 
     actions.change_provider = setmetatable({}, {
@@ -216,7 +216,7 @@ vim.api.nvim_create_user_command('Minuet', function(args)
     else
         local action_group = actions[command]
         if not action_group then
-            vim.notify('Invalid Minuet command: ' .. tostring(command), vim.log.levels.ERROR)
+            vim.notify('Invalid Harmonize command: ' .. tostring(command), vim.log.levels.ERROR)
             return
         end
 
@@ -231,7 +231,7 @@ vim.api.nvim_create_user_command('Minuet', function(args)
 
         local action_fn = action_group[action_name]
         if not action_fn then
-            vim.notify('Minuet ' .. command .. ' requires a valid action', vim.log.levels.ERROR)
+            vim.notify('Harmonize ' .. command .. ' requires a valid action', vim.log.levels.ERROR)
             return
         end
 
@@ -239,7 +239,7 @@ vim.api.nvim_create_user_command('Minuet', function(args)
     end
 end, {
     nargs = '+',
-    complete = minuet_complete,
+    complete = harmonize_complete,
 })
 
 return M

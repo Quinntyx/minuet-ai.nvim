@@ -1,7 +1,7 @@
 local M = {}
 
-function M.notify(msg, minuet_level, vim_level, opts)
-    local config = require('minuet').config
+function M.notify(msg, harmonize_level, vim_level, opts)
+    local config = require('harmonize').config
     local notify_levels = {
         debug = 0,
         verbose = 1,
@@ -9,7 +9,7 @@ function M.notify(msg, minuet_level, vim_level, opts)
         error = 3,
     }
 
-    if config.notify and notify_levels[minuet_level] >= notify_levels[config.notify] then
+    if config.notify and notify_levels[harmonize_level] >= notify_levels[config.notify] then
         vim.notify(msg, vim_level, opts)
     end
 end
@@ -172,11 +172,11 @@ end
 
 -- A self-contained copy of the context shape completion menus use.
 
---- @class minuet.BlinkCmpContext
+--- @class harmonize.BlinkCmpContext
 --- @field line string
 --- @field cursor number[]
 
----@param blink_context minuet.BlinkCmpContext?
+---@param blink_context harmonize.BlinkCmpContext?
 function M.make_cmp_context(blink_context)
     local self = {}
     local cursor
@@ -207,7 +207,7 @@ end
 ---     - is_incomplete_before: boolean - True if content before cursor was truncated
 ---     - is_incomplete_after: boolean - True if content after cursor was truncated
 function M.get_context(cmp_context)
-    local config = require('minuet').config
+    local config = require('harmonize').config
 
     local cursor = cmp_context.cursor
     local lines_before_list = vim.api.nvim_buf_get_lines(0, 0, cursor.line, false)
@@ -266,7 +266,7 @@ end
 ---@param context { lines_before: string?, lines_after: string? }
 ---@return string?
 function M.filter_text(text, context)
-    local config = require('minuet').config
+    local config = require('harmonize').config
     local before_cursor_filter_length = M.get_or_eval_value(config.before_cursor_filter_length)
     local after_cursor_filter_length = M.get_or_eval_value(config.after_cursor_filter_length)
 
@@ -321,12 +321,12 @@ function M.filter_text(text, context)
     return filtered_text
 end
 
----@class minuet.TrimCompletionItemOpts
+---@class harmonize.TrimCompletionItemOpts
 ---@field keep_leading_newline? boolean
 
 --- Remove the trailing and leading whitespace for a single completion item
 ---@param item string
----@param opts? minuet.TrimCompletionItemOpts
+---@param opts? harmonize.TrimCompletionItemOpts
 ---@return string?
 function M.trim_completion_item(item, opts)
     if not item:find '%S' then -- skip entries that contain only whitespace
@@ -345,7 +345,7 @@ end
 
 --- Remove the trailing and leading whitespace for each completion item
 ---@param items string[]
----@param opts? minuet.TrimCompletionItemOpts
+---@param opts? harmonize.TrimCompletionItemOpts
 ---@return string[]
 function M.trim_completion_items(items, opts)
     local new = {}
@@ -536,16 +536,16 @@ M.list_dedup = function(list)
     return items_cleaned
 end
 
----@class minuet.EventData
+---@class harmonize.EventData
 ---@field provider string the name of the provider
 ---@field name string the name of the subprovider for openai-compatible and openai-fim-compatible
 ---@field model string the model name used during this event
 ---@field n_requests number the number of requests launched during this event
 ---@field request_idx? number the index of the current request
----@field timestamp number the timestamp of the event at MminuetRequestStartedPre
+---@field timestamp number the timestamp of the event at MharmonizeRequestStartedPre
 
----@param event string The minuet event to run
----@param opts minuet.EventData The minuet data event
+---@param event string The harmonize event to run
+---@param opts harmonize.EventData The harmonize data event
 function M.run_event(event, opts)
     opts = opts or {}
     vim.api.nvim_exec_autocmds('User', { pattern = event, data = opts })
@@ -556,7 +556,7 @@ end
 ---@param data_file string
 ---@return string[]
 function M.make_curl_args(end_point, headers, data_file)
-    local config = require('minuet').config
+    local config = require('harmonize').config
     local curl_extra_args = M.get_or_eval_value(config.curl_extra_args)
     ---@cast curl_extra_args string[]
     local args = {}

@@ -64,15 +64,15 @@ We utilize two distinct strategies when constructing prompts:
 
 To access the **Suffix First Style** default prompt, use:
 
-1. `require('minuet.config').default_system`
-1. `require('minuet.config').default_few_shots`
-1. `require('minuet.config').default_chat_input`
+1. `require('harmonize.config').default_system`
+1. `require('harmonize.config').default_few_shots`
+1. `require('harmonize.config').default_chat_input`
 
 To access the **Prefix First Style** default prompt, use:
 
-1. `require('minuet.config').default_system_prefix_first`
-1. `require('minuet.config').default_few_shots_prefix_first`
-1. `require('minuet.config').default_chat_input_prefix_first`
+1. `require('harmonize.config').default_system_prefix_first`
+1. `require('harmonize.config').default_few_shots_prefix_first`
+1. `require('harmonize.config').default_chat_input_prefix_first`
 
 ## Default Template
 
@@ -298,7 +298,7 @@ takes no argument and returns a table in the following form:
 Below is an example to configure the prompt based on filetype:
 
 ```lua
-require('minuet').setup {
+require('harmonize').setup {
     provider_options = {
         openai = {
             system = {
@@ -306,7 +306,7 @@ require('minuet').setup {
                     if vim.bo.ft == 'tex' then
                         return [[your prompt for completing prose.]]
                     else
-                        return require('minuet.config').default_system.prompt
+                        return require('harmonize.config').default_system.prompt
                     end
                 end,
             },
@@ -316,7 +316,7 @@ require('minuet').setup {
                         -- your few shots examples for prose
                     }
                 else
-                    return require('minuet.config').default_few_shots
+                    return require('harmonize.config').default_few_shots
                 end
             end,
         },
@@ -336,7 +336,7 @@ Please note that you should not copy-paste this into your configuration, as it
 represents the **default setting** applied to Gemini.
 
 ```lua
-local gemini_prompt = require('minuet.config').default_system_prefix_first.prompt
+local gemini_prompt = require('harmonize.config').default_system_prefix_first.prompt
 
 local gemini_few_shots = {}
 
@@ -363,9 +363,9 @@ local gemini_chat_input_template =
     '{{{language}}}\n{{{tab}}}\n<contextBeforeCursor>\n{{{context_before_cursor}}}<cursorPosition>\n<contextAfterCursor>\n{{{context_after_cursor}}}'
 
 
-gemini_few_shots[2] = require('minuet.config').default_few_shots[2]
+gemini_few_shots[2] = require('harmonize.config').default_few_shots[2]
 
-require('minuet').setup {
+require('harmonize').setup {
     provider = 'gemini',
     provider_options = {
         gemini = {

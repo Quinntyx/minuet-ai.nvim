@@ -1,5 +1,5 @@
 local M = {}
-local utils = require 'minuet.utils'
+local utils = require 'harmonize.utils'
 
 -- Currently running completion jobs, basically forked curl processes.
 M.current_jobs = {}
@@ -42,14 +42,14 @@ function M.terminate_all_jobs()
     M.current_jobs = {}
 end
 
----@class minuet.JobHandlers
+---@class harmonize.JobHandlers
 ---@field on_exit fun(job: vim.SystemObj, result: vim.SystemCompleted)
 ---@field on_stdout? fun(err: string|nil, data: string|nil) Receive streamed output line by line.
 ---@field on_spawn_error? fun()
 
 ---@param command string
 ---@param args string[]
----@param handlers minuet.JobHandlers
+---@param handlers harmonize.JobHandlers
 ---@return vim.SystemObj?
 function M.start_job(command, args, handlers)
     local cmd = { command }

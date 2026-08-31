@@ -1,14 +1,14 @@
 -- referenced from copilot.lua https://github.com/zbirenbaum/copilot.lua
 local M = {}
-local utils = require 'minuet.utils'
+local utils = require 'harmonize.utils'
 local api = vim.api
 local uv = vim.uv or vim.loop
 
-M.ns_id = api.nvim_create_namespace 'minuet.virtualtext'
-M.augroup = api.nvim_create_augroup('MinuetVirtualText', { clear = true })
+M.ns_id = api.nvim_create_namespace 'harmonize.virtualtext'
+M.augroup = api.nvim_create_augroup('HarmonizeVirtualText', { clear = true })
 
-if vim.tbl_isempty(api.nvim_get_hl(0, { name = 'MinuetVirtualText' })) then
-    api.nvim_set_hl(0, 'MinuetVirtualText', { link = 'Comment' })
+if vim.tbl_isempty(api.nvim_get_hl(0, { name = 'HarmonizeVirtualText' })) then
+    api.nvim_set_hl(0, 'HarmonizeVirtualText', { link = 'Comment' })
 end
 
 local internal = {
@@ -23,11 +23,11 @@ local internal = {
 }
 
 local function should_auto_trigger()
-    return vim.b.minuet_virtual_text_auto_trigger
+    return vim.b.harmonize_virtual_text_auto_trigger
 end
 
 ---@param bufnr? integer
----@return minuet.VirtualtextSuggestionContext
+---@return harmonize.VirtualtextSuggestionContext
 local function get_ctx(bufnr)
     bufnr = bufnr or api.nvim_get_current_buf()
     if bufnr == 0 then
@@ -65,7 +65,7 @@ local function get_last_typed_text(ctx)
     return last_typed
 end
 
----@class minuet.VirtualtextSuggestionContext
+---@class harmonize.VirtualtextSuggestionContext
 ---@field suggestions? string[]
 ---@field choice? integer
 ---@field shown_choices? table<string, true>
@@ -75,7 +75,7 @@ end
 -- the front by typing or accepting. The visible suggestion is the unconsumed
 -- remainder.
 
----@param ctx minuet.VirtualtextSuggestionContext
+---@param ctx harmonize.VirtualtextSuggestionContext
 local function reset_ctx(ctx)
     ctx.suggestions = nil
     ctx.choice = nil
@@ -98,13 +98,13 @@ end
 
 ---Recompute the visible suggestion as the part of the stream the user has
 ---not taken yet.
----@param ctx minuet.VirtualtextSuggestionContext
+---@param ctx harmonize.VirtualtextSuggestionContext
 local function refresh_stream_suggestion(ctx)
     ctx.suggestions = ctx.suggestions or {}
     ctx.suggestions[1] = ctx.stream.raw:sub(ctx.stream.consumed + 1)
 end
 
----@param ctx? minuet.VirtualtextSuggestionContext
+---@param ctx? harmonize.VirtualtextSuggestionContext
 local function get_current_suggestion(ctx)
     ctx = ctx or get_ctx()
 
@@ -125,7 +125,7 @@ local function get_current_suggestion(ctx)
     return nil
 end
 
----@param ctx? minuet.VirtualtextSuggestionContext
+---@param ctx? harmonize.VirtualtextSuggestionContext
 local function update_preview(ctx)
     ctx = ctx or get_ctx()
 
@@ -134,13 +134,13 @@ local function update_preview(ctx)
 
     clear_preview()
 
-    local show_on_completion_menu = require('minuet').config.virtualtext.show_on_completion_menu
+    local show_on_completion_menu = require('harmonize').config.virtualtext.show_on_completion_menu
 
     if not suggestion or #display_lines == 0 or (not show_on_completion_menu and utils.completion_menu_visible()) then
         return
     end
 
-    if require('minuet').config.virtualtext.display_singleline and #display_lines > 1 then
+    if require('harmonize').config.virtualtext.display_singleline and #display_lines > 1 then
         if display_lines[1] ~= '' then
             -- Show only the remainder of the current line.
             display_lines = { display_lines[1] }
@@ -162,14 +162,14 @@ local function update_preview(ctx)
 
     local extmark = {
         id = internal.extmark_id,
-        virt_text = { { display_lines[1], 'MinuetVirtualText' } },
+        virt_text = { { display_lines[1], 'HarmonizeVirtualText' } },
         virt_text_pos = 'inline',
     }
 
     if #display_lines > 1 then
         extmark.virt_lines = {}
         for i = 2, #display_lines do
-            extmark.virt_lines[i - 1] = { { display_lines[i], 'MinuetVirtualText' } }
+            extmark.virt_lines[i - 1] = { { display_lines[i], 'HarmonizeVirtualText' } }
         end
 
         local last_line = #display_lines - 1
@@ -191,7 +191,7 @@ local function update_preview(ctx)
     ctx.last_pos = api.nvim_win_get_cursor(0)
 end
 
----@param ctx? minuet.VirtualtextSuggestionContext
+---@param ctx? harmonize.VirtualtextSuggestionContext
 local function cleanup(ctx)
     ctx = ctx or get_ctx()
     stop_timer()
@@ -199,7 +199,7 @@ local function cleanup(ctx)
     clear_preview()
 end
 
----@param ctx minuet.VirtualtextSuggestionContext
+---@param ctx harmonize.VirtualtextSuggestionContext
 ---@return boolean Returns true if there are suggestions matching the user’s typed text; otherwise, false.
 local function update_suggestion_on_typing(ctx)
     if not (ctx and ctx.suggestions and ctx.choice) then
@@ -241,13 +241,13 @@ local function trigger(bufnr)
         return
     end
 
-    utils.notify('Minuet virtual text started', 'verbose')
+    utils.notify('Harmonize virtual text started', 'verbose')
 
-    local config = require('minuet').config
+    local config = require('harmonize').config
 
     local context = utils.get_context(utils.make_cmp_context())
 
-    local provider = require('minuet.backends.' .. config.provider)
+    local provider = require('harmonize.backends.' .. config.provider)
     local timestamp = uv.now()
     internal.current_completion_timestamp = timestamp
 
@@ -333,11 +333,11 @@ local function schedule()
 
     stop_timer()
 
-    local config = require('minuet').config
+    local config = require('harmonize').config
     local bufnr = api.nvim_get_current_buf()
 
     internal.timer = vim.defer_fn(function()
-        local show_on_completion_menu = require('minuet').config.virtualtext.show_on_completion_menu
+        local show_on_completion_menu = require('harmonize').config.virtualtext.show_on_completion_menu
 
         if
             internal.is_on_throttle
@@ -467,9 +467,9 @@ function action.accept(n_lines)
     local line, col = cursor[1] - 1, cursor[2]
 
     if vim.fn.pumvisible() == 1 then
-        -- Accepting Minuet completion while the pum is open is temporary; when
+        -- Accepting Harmonize completion while the pum is open is temporary; when
         -- the user closes the pum, Vim restores the buffer state and removes
-        -- Minuet's completion text. Therefore we need to close the pum before
+        -- Harmonize's completion text. Therefore we need to close the pum before
         -- accepting.
         api.nvim_feedkeys(api.nvim_replace_termcodes('<C-e>', true, true, true), 'n', true)
     end
@@ -535,9 +535,9 @@ function action.accept_chunk()
     local line, col = cursor[1] - 1, cursor[2]
 
     if vim.fn.pumvisible() == 1 then
-        -- Accepting Minuet completion while the pum is open is temporary; when
+        -- Accepting Harmonize completion while the pum is open is temporary; when
         -- the user closes the pum, Vim restores the buffer state and removes
-        -- Minuet's completion text. Therefore we need to close the pum before
+        -- Harmonize's completion text. Therefore we need to close the pum before
         -- accepting.
         api.nvim_feedkeys(api.nvim_replace_termcodes('<C-e>', true, true, true), 'n', true)
     end
@@ -564,19 +564,19 @@ function action.is_visible()
 end
 
 function action.disable_auto_trigger()
-    vim.b.minuet_virtual_text_auto_trigger = false
-    vim.notify('Minuet Virtual Text auto trigger disabled', vim.log.levels.INFO)
+    vim.b.harmonize_virtual_text_auto_trigger = false
+    vim.notify('Harmonize Virtual Text auto trigger disabled', vim.log.levels.INFO)
 end
 
 function action.enable_auto_trigger()
-    vim.b.minuet_virtual_text_auto_trigger = true
-    vim.notify('Minuet Virtual Text auto trigger enabled', vim.log.levels.INFO)
+    vim.b.harmonize_virtual_text_auto_trigger = true
+    vim.notify('Harmonize Virtual Text auto trigger enabled', vim.log.levels.INFO)
 end
 
 function action.toggle_auto_trigger()
-    vim.b.minuet_virtual_text_auto_trigger = not should_auto_trigger()
+    vim.b.harmonize_virtual_text_auto_trigger = not should_auto_trigger()
     vim.notify(
-        'Minuet Virtual Text auto trigger ' .. (should_auto_trigger() and 'enabled' or 'disabled'),
+        'Harmonize Virtual Text auto trigger ' .. (should_auto_trigger() and 'enabled' or 'disabled'),
         vim.log.levels.INFO
     )
 end
@@ -641,99 +641,99 @@ local function create_autocmds()
     api.nvim_create_autocmd('InsertLeave', {
         group = internal.augroup,
         callback = autocmd.on_insert_leave,
-        desc = '[minuet.virtualtext] insert leave',
+        desc = '[harmonize.virtualtext] insert leave',
     })
 
     api.nvim_create_autocmd('BufLeave', {
         group = internal.augroup,
         callback = autocmd.on_buf_leave,
-        desc = '[minuet.virtualtext] buf leave',
+        desc = '[harmonize.virtualtext] buf leave',
     })
 
     api.nvim_create_autocmd('InsertEnter', {
         group = internal.augroup,
         callback = autocmd.on_insert_enter,
-        desc = '[minuet.virtualtext] insert enter',
+        desc = '[harmonize.virtualtext] insert enter',
     })
 
     api.nvim_create_autocmd('BufEnter', {
         group = internal.augroup,
         callback = autocmd.on_buf_enter,
-        desc = '[minuet.virtualtext] buf enter',
+        desc = '[harmonize.virtualtext] buf enter',
     })
 
     api.nvim_create_autocmd('CursorMovedI', {
         group = internal.augroup,
         callback = autocmd.on_cursor_moved_i,
-        desc = '[minuet.virtualtext] cursor moved insert',
+        desc = '[harmonize.virtualtext] cursor moved insert',
     })
 
     api.nvim_create_autocmd('TextChangedP', {
         group = internal.augroup,
         callback = autocmd.on_text_changed_p,
-        desc = '[minuet.virtualtext] text changed p',
+        desc = '[harmonize.virtualtext] text changed p',
     })
 
     api.nvim_create_autocmd('BufUnload', {
         group = internal.augroup,
         callback = autocmd.on_buf_unload,
-        desc = '[minuet.virtualtext] buf unload',
+        desc = '[harmonize.virtualtext] buf unload',
     })
 end
 
 local function set_keymaps(keymap)
     if keymap.accept then
         vim.keymap.set('i', keymap.accept, action.accept, {
-            desc = '[minuet.virtualtext] accept suggestion',
+            desc = '[harmonize.virtualtext] accept suggestion',
             silent = true,
         })
     end
 
     if keymap.accept_line then
         vim.keymap.set('i', keymap.accept_line, action.accept_line, {
-            desc = '[minuet.virtualtext] accept suggestion (line)',
+            desc = '[harmonize.virtualtext] accept suggestion (line)',
             silent = true,
         })
     end
 
     if keymap.accept_chunk then
         vim.keymap.set('i', keymap.accept_chunk, action.accept_chunk, {
-            desc = '[minuet.virtualtext] accept suggestion (chunk)',
+            desc = '[harmonize.virtualtext] accept suggestion (chunk)',
             silent = true,
         })
     end
 
     if keymap.accept_n_lines then
         vim.keymap.set('i', keymap.accept_n_lines, action.accept_n_lines, {
-            desc = '[minuet.virtualtext] accept suggestion (n lines)',
+            desc = '[harmonize.virtualtext] accept suggestion (n lines)',
             silent = true,
         })
     end
 
     if keymap.next then
         vim.keymap.set('i', keymap.next, action.next, {
-            desc = '[minuet.virtualtext] next suggestion',
+            desc = '[harmonize.virtualtext] next suggestion',
             silent = true,
         })
     end
 
     if keymap.prev then
         vim.keymap.set('i', keymap.prev, action.prev, {
-            desc = '[minuet.virtualtext] prev suggestion',
+            desc = '[harmonize.virtualtext] prev suggestion',
             silent = true,
         })
     end
 
     if keymap.dismiss then
         vim.keymap.set('i', keymap.dismiss, action.dismiss, {
-            desc = '[minuet.virtualtext] dismiss suggestion',
+            desc = '[harmonize.virtualtext] dismiss suggestion',
             silent = true,
         })
     end
 end
 
 function M.setup()
-    local config = require('minuet').config
+    local config = require('harmonize').config
     api.nvim_clear_autocmds { group = M.augroup }
 
     if #config.virtualtext.auto_trigger_ft > 0 then
@@ -741,11 +741,11 @@ function M.setup()
             pattern = config.virtualtext.auto_trigger_ft,
             callback = function()
                 if not vim.tbl_contains(config.virtualtext.auto_trigger_ignore_ft, vim.bo.ft) then
-                    vim.b.minuet_virtual_text_auto_trigger = true
+                    vim.b.harmonize_virtual_text_auto_trigger = true
                 end
             end,
             group = M.augroup,
-            desc = 'minuet virtual text filetype auto trigger',
+            desc = 'harmonize virtual text filetype auto trigger',
         })
     end
 

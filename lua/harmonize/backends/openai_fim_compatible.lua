@@ -1,12 +1,12 @@
-local base = require 'minuet.backends.openai_base'
-local utils = require 'minuet.utils'
+local base = require 'harmonize.backends.openai_base'
+local utils = require 'harmonize.utils'
 
 local M = {}
 
 local notified_on_using_chat_endpoint = false
 
 M.is_available = function()
-    local config = require('minuet').config
+    local config = require('harmonize').config
     local options = config.provider_options.openai_fim_compatible
     if options.end_point == '' or options.api_key == '' or options.name == '' then
         return false
@@ -39,7 +39,7 @@ function M.get_text_fn(json)
 end
 
 M.complete = function(context, callback, on_update)
-    local config = require('minuet').config
+    local config = require('harmonize').config
     local options = vim.deepcopy(config.provider_options.openai_fim_compatible)
 
     local get_text_fn = M.get_text_fn

@@ -6,7 +6,7 @@ return {
         run = function()
             helpers.setup_root_config()
 
-            local utils = helpers.reload 'minuet.utils'
+            local utils = helpers.reload 'harmonize.utils'
             local content = {
                 message = 'hello',
                 count = 2,
@@ -34,7 +34,7 @@ return {
         run = function()
             helpers.setup_root_config()
 
-            local utils = helpers.reload 'minuet.utils'
+            local utils = helpers.reload 'harmonize.utils'
 
             helpers.expect_equal(utils.trim_completion_items { '  foo  ', '   ', '\n\t', ' bar' }, { 'foo', 'bar' })
         end,
@@ -47,7 +47,7 @@ return {
                 after_cursor_filter_length = 0,
             }
 
-            local utils = helpers.reload 'minuet.utils'
+            local utils = helpers.reload 'harmonize.utils'
 
             helpers.expect_equal(
                 utils.filter_text('\nfoo', {
@@ -63,7 +63,7 @@ return {
         run = function()
             helpers.setup_root_config()
 
-            local utils = helpers.reload 'minuet.utils'
+            local utils = helpers.reload 'harmonize.utils'
             local data_file = vim.fn.tempname()
             vim.fn.writefile({ '{}' }, data_file)
 
@@ -92,7 +92,7 @@ return {
         run = function()
             helpers.setup_root_config()
 
-            local utils = helpers.reload 'minuet.utils'
+            local utils = helpers.reload 'harmonize.utils'
 
             local system_prompt = utils.make_system_prompt({
                 template = '{{{prompt}}} | {{{guidelines}}} | {{{n_completion_template}}} | {{{x}}} mid {{{y}}} end',
@@ -115,7 +115,7 @@ return {
         run = function()
             helpers.setup_root_config()
 
-            local utils = helpers.reload 'minuet.utils'
+            local utils = helpers.reload 'harmonize.utils'
 
             local system_prompt = utils.make_system_prompt({
                 template = '{{{prompt}}}{{{n_completion_template}}}',
@@ -131,7 +131,7 @@ return {
         run = function()
             helpers.setup_root_config()
 
-            local utils = helpers.reload 'minuet.utils'
+            local utils = helpers.reload 'harmonize.utils'
 
             local shots = utils.make_chat_llm_shot({
                 lines_before = 'above',
@@ -158,7 +158,7 @@ return {
         run = function()
             helpers.setup_root_config()
 
-            local utils = helpers.reload 'minuet.utils'
+            local utils = helpers.reload 'harmonize.utils'
 
             local shots = utils.make_chat_llm_shot({}, {
                 template = '{{{static}}}',
@@ -173,7 +173,7 @@ return {
         run = function()
             helpers.setup_root_config()
 
-            local utils = helpers.reload 'minuet.utils'
+            local utils = helpers.reload 'harmonize.utils'
 
             local rendered = utils.expand_template('{{{a}}}', {
                 a = '{{{b}}}',

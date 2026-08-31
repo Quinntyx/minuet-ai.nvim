@@ -1,6 +1,6 @@
 local M = {}
-local common = require 'minuet.backends.common'
-local utils = require 'minuet.utils'
+local common = require 'harmonize.backends.common'
+local utils = require 'harmonize.utils'
 
 function M.openai_get_text_fn_no_stream(json)
     return json.choices[1].message.content
@@ -19,7 +19,7 @@ local function prepare_fim_items(items, context)
 end
 
 function M.complete_openai_base(options, context, callback)
-    local config = require('minuet').config
+    local config = require('harmonize').config
 
     common.terminate_all_jobs()
 
@@ -58,7 +58,7 @@ function M.complete_openai_base(options, context, callback)
     local provider_name = 'openai_compatible'
     local timestamp = os.time()
 
-    utils.run_event('MinuetRequestStartedPre', {
+    utils.run_event('HarmonizeRequestStartedPre', {
         provider = provider_name,
         name = options.name,
         model = options.model,
@@ -68,7 +68,7 @@ function M.complete_openai_base(options, context, callback)
 
     local new_job = common.start_job(config.curl_cmd, args, {
         on_exit = function(_, result)
-            utils.run_event('MinuetRequestFinished', {
+            utils.run_event('HarmonizeRequestFinished', {
                 provider = provider_name,
                 model = options.model,
                 name = options.name,
@@ -100,7 +100,7 @@ function M.complete_openai_base(options, context, callback)
         end,
         on_spawn_error = function()
             vim.uv.fs_unlink(data_file)
-            utils.run_event('MinuetRequestFinished', {
+            utils.run_event('HarmonizeRequestFinished', {
                 provider = provider_name,
                 model = options.model,
                 name = options.name,
@@ -116,7 +116,7 @@ function M.complete_openai_base(options, context, callback)
         return
     end
 
-    utils.run_event('MinuetRequestStarted', {
+    utils.run_event('HarmonizeRequestStarted', {
         provider = provider_name,
         name = options.name,
         model = options.model,
@@ -127,7 +127,7 @@ function M.complete_openai_base(options, context, callback)
 end
 
 function M.complete_openai_fim_base(options, get_text_fn, context, callback, on_update)
-    local config = require('minuet').config
+    local config = require('harmonize').config
 
     common.terminate_all_jobs()
 
@@ -169,7 +169,7 @@ function M.complete_openai_fim_base(options, get_text_fn, context, callback, on_
     local provider_name = 'openai_fim_compatible'
     local timestamp = os.time()
 
-    utils.run_event('MinuetRequestStartedPre', {
+    utils.run_event('HarmonizeRequestStartedPre', {
         provider = provider_name,
         name = options.name,
         model = options.model,
@@ -222,7 +222,7 @@ function M.complete_openai_fim_base(options, get_text_fn, context, callback, on_
                 received_tokens = #accumulated > 0
             end,
             on_exit = function(_, out)
-                utils.run_event('MinuetRequestFinished', {
+                utils.run_event('HarmonizeRequestFinished', {
                     provider = provider_name,
                     name = options.name,
                     model = options.model,
@@ -258,7 +258,7 @@ function M.complete_openai_fim_base(options, get_text_fn, context, callback, on_
             end,
             on_spawn_error = function()
                 vim.uv.fs_unlink(data_file)
-                utils.run_event('MinuetRequestFinished', {
+                utils.run_event('HarmonizeRequestFinished', {
                     provider = provider_name,
                     name = options.name,
                     model = options.model,
@@ -271,7 +271,7 @@ function M.complete_openai_fim_base(options, get_text_fn, context, callback, on_
         })
 
         if new_job then
-            utils.run_event('MinuetRequestStarted', {
+            utils.run_event('HarmonizeRequestStarted', {
                 provider = provider_name,
                 name = options.name,
                 model = options.model,

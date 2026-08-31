@@ -2,7 +2,7 @@
   - [**For Systems with More Than 16GB VRAM**](#for-systems-with-more-than-16gb-vram)
     - [**For Systems with Less Than 16GB VRAM**](#for-systems-with-less-than-16gb-vram)
   - [**For Systems with Less Than 8GB VRAM**](#for-systems-with-less-than-8gb-vram)
-  - [Example minuet config](#example-minuet-config)
+  - [Example harmonize config](#example-harmonize-config)
   - [**Acknowledgment**](#acknowledgment)
 - [Integration with VectorCode](#integration-with-vectorcode)
   - [Chat LLMs](#chat-llms)
@@ -41,10 +41,10 @@ llama-server \
     --ctx-size 0 --cache-reuse 256
 ```
 
-## Example minuet config
+## Example harmonize config
 
 ```lua
-require('minuet').setup {
+require('harmonize').setup {
     provider = 'openai_fim_compatible',
     -- I recommend beginning with a small context window size and incrementally
     -- expanding it, depending on your local computing power. A context window
@@ -104,9 +104,9 @@ the prompt, enhancing completion results. This retrieval process occurs locally
 on your machine, though you may opt to utilize a hosted embedding model or
 database provider if desired.
 
-Note that `minuet.config.context_window` controls only the context window
+Note that `harmonize.config.context_window` controls only the context window
 before and after the cursor; it does not affect the data returned by
-VectorCode, as that information is external and not managed by Minuet. If
+VectorCode, as that information is external and not managed by Harmonize. If
 needed, consider limiting the context size on your side.
 
 This recipe demonstrates a basic setup of `VectorCode`. For comprehensive
@@ -163,7 +163,7 @@ local gemini = {
     },
 }
 
-require('minuet').setup {
+require('harmonize').setup {
     provider = 'gemini',
     provider_options = {
         gemini = gemini,
