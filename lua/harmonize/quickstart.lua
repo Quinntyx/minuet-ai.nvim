@@ -54,17 +54,27 @@ function M.resolve_binary()
     return nil
 end
 
+local function has_curl()
+    return vim.fn.executable 'curl' == 1
+end
+
 -- Newest tag whose Ubuntu x64 asset still exists; `nil` when the API cannot
 -- be reached (the caller falls back to the pinned tag).
 function M.latest_release_tag()
-    local handle = vim.system({
+    if not has_curl() then
+        return nil
+    end
+    local ok_handle, handle_or_err = pcall(vim.system, {
         'curl',
         '-fsSL',
         '--max-time',
         '10',
         'https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=20',
     }, { text = true })
-    local result = handle:wait()
+    if not ok_handle then
+        return nil
+    end
+    local result = handle_or_err:wait()
     if result.code ~= 0 then
         return nil
     end
@@ -98,6 +108,14 @@ function M.download_binary(version, then_fn)
 
     if vim.fn.executable 'unzip' ~= 1 then
         vim.notify('llama.cpp not found and `unzip` is missing; install it or put `llama` on PATH', vim.log.levels.ERROR)
+        return
+    end
+
+    if not has_curl() then
+        vim.notify(
+            'llama.cpp not found and `curl` is missing; install it or put `llama` on PATH',
+            vim.log.levels.ERROR
+        )
         return
     end
 
@@ -193,15 +211,24 @@ function M.wire_provider(config, qs)
 end
 
 local function server_health(qs)
-    local handle = vim.system({
+    if not has_curl() then
+        -- Without a probe we assume the server is down and try to start it;
+        -- the failure message then tells the user why that could not work.
+        return false
+    end
+    local ok_handle, handle_or_err = pcall(vim.system, {
         'curl',
         '-fsS',
         '--max-time',
         '2',
         ('http://%s:%d/health'):format(qs.host, qs.port),
     }, { text = true })
-    local result = handle:wait(3000)
-    return result.code == 0
+    if not ok_handle then
+        return false
+    end
+    local result = handle_or_err:wait(3000)
+    -- wait returns nil when the timeout is reached.
+    return result ~= nil and result.code == 0
 end
 
 local function start_server(qs)
