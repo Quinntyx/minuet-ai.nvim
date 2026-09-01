@@ -38,7 +38,9 @@
   else). The server is left running when nvim exits by default;
   `kill_on_exit` stops it on exit.
 - Suggestion choice cycling was removed along with the `next`/`prev` actions
-  and keymaps; the first completion suggestion is used.
+  and keymaps; the first completion suggestion is used. The manual invoke
+  that shared the `next` key moved to a dedicated `trigger` action, bindable
+  through `keymap.trigger`.
 
 ## Defaults
 

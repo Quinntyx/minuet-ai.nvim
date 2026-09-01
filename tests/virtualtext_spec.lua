@@ -111,4 +111,39 @@ return {
             end)
         end,
     },
+    {
+        name = 'action.trigger requests a completion on demand',
+        run = function()
+            with_display_scenario(nil, {
+                complete = function(_, callback, on_update)
+                    on_update 'manual completion'
+                    callback { 'manual completion' }
+                end,
+            }, function(bufnr, virtualtext)
+                virtualtext.action.trigger()
+                helpers.wait_until(function()
+                    return extmark_details(virtualtext, bufnr) ~= nil
+                end, 1000, 'the suggestion must be shown')
+
+                local details = extmark_details(virtualtext, bufnr)
+                helpers.expect_equal(details.virt_text[1][1], 'manual completion')
+            end)
+        end,
+    },
+    {
+        name = 'keymap.trigger binds the manual request action',
+        run = function()
+            with_display_scenario({
+                keymap = { trigger = '<M-b>' },
+            }, {
+                complete = function(_, callback)
+                    callback { 'x' }
+                end,
+            }, function()
+                local binding = vim.fn.maparg('<M-b>', 'i', false, true)
+                helpers.expect_truthy(binding.callback or binding.rhs, 'the trigger key must be bound')
+                helpers.expect_equal(binding.desc, '[harmonize.virtualtext] manually request a completion')
+            end)
+        end,
+    },
 }
