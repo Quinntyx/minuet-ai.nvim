@@ -15,6 +15,9 @@ function M.setup(config)
 
     M.config = vim.tbl_deep_extend('force', default_config, config or {})
 
+    if M.config.quick_start then
+        require('harmonize.quickstart').ensure(M.config, M.config.quick_start)
+    end
     require('harmonize.virtualtext').setup()
 end
 

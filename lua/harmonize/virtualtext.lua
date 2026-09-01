@@ -20,6 +20,13 @@ local internal = {
     context = {},
     is_on_throttle = false,
     current_completion_timestamp = 0,
+    -- Typing-only trigger mode distinguishes real typing from pure
+    -- navigation: `last_seen_changedtick` remembers the buffer state the last
+    -- event processed, and `typing_event_armed` marks that a TextChangedI /
+    -- CursorMovedI pair has already handled the change, so the partner event
+    -- is not mistaken for an arrow-key move.
+    last_seen_changedtick = 0,
+    typing_event_armed = false,
 }
 
 local function should_auto_trigger()
@@ -582,6 +589,8 @@ end
 
 M.action = action
 
+M.autocmd = autocmd
+
 local autocmd = {}
 
 function autocmd.on_insert_leave()
@@ -595,7 +604,10 @@ function autocmd.on_buf_leave()
 end
 
 function autocmd.on_insert_enter()
-    if should_auto_trigger() then
+    -- Re-baseline the change tick so the first cursor move inside insert mode
+    -- is never mistaken for a freshly typed character.
+    internal.last_seen_changedtick = vim.b.changedtick
+    if should_auto_trigger() and not require('harmonize').config.virtualtext.trigger_on_typing then
         schedule()
     end
 end
@@ -605,8 +617,56 @@ function autocmd.on_buf_enter()
         autocmd.on_insert_enter()
     end
 end
+---Returns true when the event closes out a real text change (typing, paste)
+---and was handled; false for a pure cursor move with no buffer change.
+local function handle_insert_change()
+    if internal.typing_event_armed then
+        -- The partner event of this TextChangedI / CursorMovedI pair already
+        -- did the work.
+        internal.typing_event_armed = false
+        return true
+    end
+
+    local tick = vim.b.changedtick
+    if tick == internal.last_seen_changedtick then
+        -- TextChangedI can fire without a change (insert-enter, typeahead
+        -- drain); treat it as nothing.
+        return false
+    end
+    internal.last_seen_changedtick = tick
+    internal.typing_event_armed = true
+
+    local ctx = get_ctx()
+    if update_suggestion_on_typing(ctx) then
+        -- The typed text continues the current suggestion; keep it in sync
+        -- without starting a new request.
+        return true
+    end
+
+    if ctx.shown_choices and next(ctx.shown_choices) then
+        cleanup(ctx)
+    end
+    if should_auto_trigger() then
+        schedule()
+    end
+    return true
+end
 
 function autocmd.on_cursor_moved_i()
+    local config = require('harmonize').config
+
+    if config.virtualtext.trigger_on_typing then
+        if not handle_insert_change() then
+            -- Pure navigation (arrow keys, scrolling): never fire a request;
+            -- drop a stale suggestion left at the previous position.
+            local ctx = get_ctx()
+            if ctx.shown_choices and next(ctx.shown_choices) then
+                cleanup(ctx)
+            end
+        end
+        return
+    end
+
     local ctx = get_ctx()
 
     if update_suggestion_on_typing(ctx) then
@@ -623,12 +683,18 @@ function autocmd.on_cursor_moved_i()
     end
 end
 
+function autocmd.on_text_changed_i()
+    if require('harmonize').config.virtualtext.trigger_on_typing then
+        handle_insert_change()
+    end
+end
+
 function autocmd.on_cursor_hold_i()
     update_preview()
 end
 
 function autocmd.on_text_changed_p()
-    autocmd.on_cursor_moved_i()
+    autocmd.on_text_changed_i()
 end
 
 ---@param info { buf: integer }
@@ -665,6 +731,12 @@ local function create_autocmds()
         group = internal.augroup,
         callback = autocmd.on_cursor_moved_i,
         desc = '[harmonize.virtualtext] cursor moved insert',
+    })
+
+    api.nvim_create_autocmd('TextChangedI', {
+        group = internal.augroup,
+        callback = autocmd.on_text_changed_i,
+        desc = '[harmonize.virtualtext] text changed insert',
     })
 
     api.nvim_create_autocmd('TextChangedP', {

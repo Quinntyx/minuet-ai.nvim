@@ -59,8 +59,37 @@ revealed line by line and tokens streamed in as the model generates them.
 
 ## Quick Start
 
-The minimal setup is just your endpoint. For a local llama.cpp server
-(`llama-server --port 8012` serving a FIM-capable model):
+The fastest way to try it is the built-in quick start: it downloads a
+llama.cpp binary and runs a local server for you (the model is pulled from
+HuggingFace on the first start), then points the `openai_fim_compatible`
+provider at it.
+
+```lua
+require('harmonize').setup {
+    quick_start = true,
+}
+```
+
+That defaults to Qwen2.5-Coder-1.5B (FIM-capable, ~1.6 GB, runs on CPU). Pass
+a table to pick another model or tweak the server:
+
+```lua
+require('harmonize').setup {
+    quick_start = {
+        -- any HuggingFace GGUF repo, or a local .gguf path
+        model = 'ggml-org/Qwen2.5-Coder-0.6B-Q4_K_M-GGUF',
+        port = 8012, -- the endpoint becomes http://127.0.0.1:8012/v1/completions
+    },
+}
+```
+
+`quick_start` only takes over when the `openai_fim_compatible` endpoint is
+still the cloud default: configure your own `end_point` and the server is left
+to you. If `llama` or `llama-server` is already on PATH, it is used as is. The
+first start downloads the model, so the first request may fail until it is
+ready.
+
+Prefer your own setup? Point the provider at a server you manage:
 
 ```lua
 require('harmonize').setup {
@@ -108,10 +137,14 @@ you have not taken yet, and it is redrawn on every token.
   the chunk. A newline ends the chunk unless it is the first character (the
   case in which the line below is shown). So `b)\n.c()` is accepted as `b)`,
   then `\n.`, then `c()`.
-- When a chunk would cross a newline in the middle, it stops first — you never
-  accept text the view did not show.
+- By default, requests fire only after you actually type a character:
+  arrow-key moves and scrolling only dismiss a stale suggestion, and entering
+  insert mode alone does not trigger a request. Set
+  `virtualtext.trigger_on_typing = false` for the old behavior.
 - Typing the same characters keeps the remaining suggestion in sync; typing
   something different dismisses it and starts a fresh request.
+- When a chunk would cross a newline in the middle, it stops first — you never
+  accept text the view did not show.
 - `accept_line` takes the whole visible line; `accept_n_lines` takes any
   number, prompting for a count.
 
@@ -155,6 +188,10 @@ default_config = {
         -- Show only the remainder of the current line; when the completion
         -- starts with a newline, show the line below instead.
         display_singleline = true,
+        -- Fire a request only after a character was typed. Arrow-key moves
+        -- and scrolling dismiss the ghost text but never request, and
+        -- entering insert mode alone does not trigger either.
+        trigger_on_typing = true,
     },
     provider = 'openai_fim_compatible',
     -- Maximum characters of context before and after the cursor (~4 tokens
@@ -192,6 +229,9 @@ default_config = {
     default_chat_input_prefix_first = { ... },
     -- Config sets for the `Harmonize change_preset` command
     presets = {},
+    -- Download and run a local llama.cpp server automatically; see the
+    -- Quick Start section. `false` disables it.
+    quick_start = false,
 }
 ```
 

@@ -212,8 +212,21 @@ local M = {
         -- completion stays available for further acceptance, which lets you
         -- accept the completion one visible line at a time.
         display_singleline = true,
+        -- Fire a completion request only after a character was actually
+        -- typed. Moving the cursor with the arrow keys or scrolling dismisses
+        -- a stale suggestion but never starts a new request, and entering
+        -- insert mode alone does not trigger one either.
+        trigger_on_typing = true,
     },
     provider = 'openai_fim_compatible',
+    -- Download and run a local llama.cpp server automatically, so first-time
+    -- setup is just `require('harmonize').setup { quick_start = true }`.
+    -- Accepts a table to override the defaults (the HuggingFace model repo,
+    -- port, and server flags). When the openai_fim_compatible provider
+    -- already has a custom end_point, the server is left to you and the
+    -- endpoint is not touched.
+    ---@type boolean | table
+    quick_start = false,
     -- the maximum total characters of the context before and after the cursor
     -- 16000 characters typically equate to approximately 4,000 tokens for
     -- LLMs.
