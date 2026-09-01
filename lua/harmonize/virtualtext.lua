@@ -173,11 +173,7 @@ local function update_preview(ctx)
 
     clear_preview()
 
-    if
-        not suggestion
-        or #suggestion == 0
-        or (not config.show_on_completion_menu and utils.completion_menu_visible())
-    then
+    if not suggestion or #suggestion == 0 then
         return
     end
 
@@ -188,7 +184,7 @@ local function update_preview(ctx)
     }
 
     if config.display == 'chunk' then
-        -- Show exactly what the accept-chunk keymap completes next. A chunk
+        -- Show exactly what the accept keymap completes next. A chunk
         -- that leads with a newline is only that newline and renders empty.
         extmark.virt_text = { { split_chunk(suggestion):gsub('\n', ''), 'HarmonizeVirtualText' } }
     else
@@ -329,11 +325,9 @@ local function schedule()
     local bufnr = api.nvim_get_current_buf()
 
     internal.timer = vim.defer_fn(function()
-        local show_on_completion_menu = require('harmonize').config.show_on_completion_menu
-
         if
             internal.is_on_throttle
-            or (not show_on_completion_menu and utils.completion_menu_visible())
+            or utils.completion_menu_visible()
             or (not utils.run_hooks_until_failure(config.enable_predicates))
         then
             return
@@ -353,10 +347,9 @@ local action = {}
 
 
 ---@param n_lines? integer Number of lines to accept from the suggestion. If nil, accepts all lines.
----Accepts the current suggestion by inserting it at the cursor position.
----If n_lines is provided, only the first n_lines of the suggestion are inserted.
----After insertion, moves the cursor to the end of the inserted text.
-function action.accept(n_lines)
+---Inserts the first n_lines of the suggestion at the cursor position and
+---moves the cursor to the end of the inserted text.
+local function accept_lines(n_lines)
     local ctx = get_ctx()
 
     local suggestion = get_current_suggestion(ctx)
@@ -411,35 +404,15 @@ function action.accept(n_lines)
     end)
 end
 
-function action.accept_n_lines()
-    local cursor_pos = vim.api.nvim_win_get_cursor(0)
-    local n = vim.fn.input 'accept n lines: '
-
-    -- FIXME: vim.fn.input may change cursor position, we need to restore the
-    -- cursor position after the user input.
-
-    vim.api.nvim_win_set_cursor(0, cursor_pos)
-
-    ---@diagnostic disable-next-line:cast-local-type
-    n = tonumber(n)
-    if not n then
-        return
-    end
-    if n > 0 then
-        action.accept(n)
-    else
-        vim.notify('Invalid number of lines', vim.log.levels.ERROR)
-    end
-end
 
 function action.accept_line()
-    action.accept(1)
+    accept_lines(1)
 end
 
 ---Accepts the current suggestion up to the next chunk boundary (the current
 ---identifier plus the special characters that follow it). The rest of the
 ---suggestion stays available for further acceptance.
-function action.accept_chunk()
+function action.accept()
     local ctx = get_ctx()
 
     local suggestion = get_current_suggestion(ctx)
@@ -450,8 +423,19 @@ function action.accept_chunk()
     local chunk, remaining = split_chunk(suggestion)
     local lines = vim.split(chunk, '\n', { plain = true })
 
+    -- Taking a chunk counts as taking it from the stream, so the ghost
+    -- continues with what follows and the next accept takes the chunk after
+    -- it instead of re-inserting the same one.
+    if ctx.stream then
+        ctx.stream.consumed = ctx.stream.consumed + #chunk
+        refresh_stream_suggestion(ctx)
+    else
+        ctx.suggestion = remaining
+    end
+
     if #remaining == 0 and not (ctx.stream and #ctx.stream.raw > 0 and not ctx.stream.done) then
         reset_ctx(ctx)
+        remaining = nil
     end
 
     clear_preview()
@@ -476,6 +460,9 @@ function action.accept_chunk()
             new_col = new_col + col
         end
         api.nvim_win_set_cursor(0, { line + #lines, new_col })
+        if remaining then
+            update_preview(ctx)
+        end
     end)
 end
 
@@ -679,7 +666,7 @@ end
 local function set_keymaps(keymap)
     if keymap.accept then
         vim.keymap.set('i', keymap.accept, action.accept, {
-            desc = '[harmonize.virtualtext] accept suggestion',
+            desc = '[harmonize.virtualtext] accept suggestion (chunk)',
             silent = true,
         })
     end
@@ -691,19 +678,7 @@ local function set_keymaps(keymap)
         })
     end
 
-    if keymap.accept_chunk then
-        vim.keymap.set('i', keymap.accept_chunk, action.accept_chunk, {
-            desc = '[harmonize.virtualtext] accept suggestion (chunk)',
-            silent = true,
-        })
-    end
 
-    if keymap.accept_n_lines then
-        vim.keymap.set('i', keymap.accept_n_lines, action.accept_n_lines, {
-            desc = '[harmonize.virtualtext] accept suggestion (n lines)',
-            silent = true,
-        })
-    end
 
 
     if keymap.dismiss then
@@ -716,6 +691,13 @@ local function set_keymaps(keymap)
     if keymap.trigger then
         vim.keymap.set('i', keymap.trigger, action.trigger, {
             desc = '[harmonize.virtualtext] manually request a completion',
+            silent = true,
+        })
+    end
+
+    if keymap.toggle then
+        vim.keymap.set('i', keymap.toggle, action.toggle_auto_trigger, {
+            desc = '[harmonize.virtualtext] toggle auto completion',
             silent = true,
         })
     end

@@ -8,7 +8,6 @@ local function with_display_scenario(overrides, backend, scenario)
         provider = 'test_display',
         debounce = 0,
         throttle = 0,
-        show_on_completion_menu = true,
     }, overrides or {}))
 
     package.loaded['harmonize.backends.test_display'] = backend
@@ -143,6 +142,59 @@ return {
                 local binding = vim.fn.maparg('<M-b>', 'i', false, true)
                 helpers.expect_truthy(binding.callback or binding.rhs, 'the trigger key must be bound')
                 helpers.expect_equal(binding.desc, '[harmonize.virtualtext] manually request a completion')
+            end)
+        end,
+    },
+    {
+        name = 'accept inserts one chunk and keeps the rest of the suggestion',
+        run = function()
+            with_display_scenario({
+                display = 'chunk',
+            }, {
+                complete = function(_, callback, on_update)
+                    on_update 'foo(bar)\nbaz'
+                    callback { 'foo(bar)\nbaz' }
+                end,
+            }, function(bufnr, virtualtext)
+                type_char(bufnr)
+                helpers.wait_until(function()
+                    return extmark_details(virtualtext, bufnr) ~= nil
+                end, 1000, 'the suggestion must be shown')
+
+                local before = vim.api.nvim_buf_get_lines(bufnr, 0, 1, false)[1]
+                local cursor = vim.api.nvim_win_get_cursor(0)
+                virtualtext.action.accept()
+                vim.wait(100)
+
+                local text = vim.api.nvim_buf_get_lines(bufnr, 0, 1, false)[1]
+                helpers.expect_equal(text, before:sub(1, cursor[2]) .. 'foo(' .. before:sub(cursor[2] + 1))
+                -- The rest of the suggestion is still offered as the next chunk.
+                local details = extmark_details(virtualtext, bufnr)
+                helpers.expect_truthy(details, 'the remaining suggestion must still be shown')
+                helpers.expect_equal(details.virt_text[1][1], 'bar)')
+            end)
+        end,
+    },
+    {
+        name = 'keymap.toggle binds the auto-completion toggle action',
+        run = function()
+            with_display_scenario({
+                keymap = { toggle = '<M-t>' },
+            }, {
+                complete = function(_, callback)
+                    callback { 'x' }
+                end,
+            }, function(bufnr, virtualtext)
+                local binding = vim.fn.maparg('<M-t>', 'i', false, true)
+                helpers.expect_truthy(binding.callback or binding.rhs, 'the toggle key must be bound')
+                helpers.expect_equal(binding.desc, '[harmonize.virtualtext] toggle auto completion')
+
+                -- The toggle flips the buffer-local auto-trigger flag.
+                helpers.expect_equal(vim.b.harmonize_virtual_text_auto_trigger, true)
+                virtualtext.action.toggle_auto_trigger()
+                helpers.expect_equal(vim.b.harmonize_virtual_text_auto_trigger, false)
+                virtualtext.action.toggle_auto_trigger()
+                helpers.expect_equal(vim.b.harmonize_virtual_text_auto_trigger, true)
             end)
         end,
     },

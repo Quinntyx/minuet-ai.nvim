@@ -8,7 +8,6 @@ local function with_trigger_scenario(overrides, scenario)
         provider = 'test_trigger',
         debounce = 0,
         throttle = 0,
-        show_on_completion_menu = true,
     }, overrides or {}))
 
     local calls = 0

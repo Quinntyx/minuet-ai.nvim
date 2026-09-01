@@ -7,18 +7,22 @@
   when the completion starts with a newline, the next line is shown below the
   cursor instead of inline to its right, matching where accepting it actually
   puts it, and the rest stays cached so it can still be accepted line by
-  line. `'chunk'` shows exactly the next chunk the accept-chunk keymap
-  completes.
-- Virtual Text: The new `accept_chunk` action accepts the completion one chunk
-  at a time, where a chunk is the current identifier plus the special
-  characters that follow it (for example `foo.bar(a, b).baz(c)` is accepted as
-  `foo.` `bar(` `a, ` `b).` `baz(` `c)`). A chunk never crosses a newline
+  line. `'chunk'` shows exactly the next chunk the `accept` keymap completes.
+- Virtual Text: `accept` is now the accept action, taking the completion one
+  chunk at a time, where a chunk is the current identifier plus the special
+  characters that follow it (for example `foo.bar(a, b).baz(c)` is accepted
+  as `foo.` `bar(` `a, ` `b).` `baz(` `c)`). A chunk never crosses a newline
   unless the newline is the first character of the completion, matching what
   the line display shows; a run like `)\n.` is accepted as
   `)` and then `\n.`. When the identifier of the current chunk has already
   been typed, the special characters that follow it end that chunk: after
   typing the `r` of `r#my_var_name`, the next chunk is `#` and only after
   that `my_var_name`.
+- Virtual Text: A `toggle` keymap switches automatic completion on and off
+  for the current buffer.
+- Providers other than `llama_cpp_managed` and `openai_fim_compatible` are
+  untested; using one shows a warning on setup unless
+  `allow_unsupported_providers = true`.
 
 ## Renamed
 
@@ -41,11 +45,16 @@
   and keymaps; the first completion suggestion is used. The manual invoke
   that shared the `next` key moved to a dedicated `trigger` action, bindable
   through `keymap.trigger`.
+- Accepting the whole completion and `accept_n_lines` are gone: `accept` now
+  takes one chunk, and accepting a chunk counts as taking it from the stream,
+  so the next chunk follows and repeated accepts never re-insert text.
+- The `show_on_completion_menu` option was removed: the ghost text is always
+  hidden while another completion menu is visible.
 
 ## Defaults
 
 - The default provider is now `openai_fim_compatible`, Tab accepts the next
-  chunk (`keymap.accept_chunk = '<Tab>'`), and the ghost text defaults to the
+  chunk (`keymap.accept = '<Tab>'`), and the ghost text defaults to the
   single-line display (`display = 'line'`): install, configure an endpoint,
   and Tab completes out of the box.
 

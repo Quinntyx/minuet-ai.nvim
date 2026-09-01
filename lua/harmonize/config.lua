@@ -187,23 +187,22 @@ local M = {
     -- auto_trigger_ft = { '*' }.
     auto_trigger_ignore_ft = {},
     keymap = {
-        accept = nil,
+        -- accept one chunk: the current identifier plus the special
+        -- characters that follow it
+        accept = '<Tab>',
+        -- accept the visible line
         accept_line = nil,
-        -- accept one chunk (the current identifier plus the special
-        -- characters that follow it)
-        accept_chunk = '<Tab>',
-        -- accept n lines (prompts for a number)
-        accept_n_lines = nil,
+        -- dismiss the ghost text
         dismiss = nil,
         -- manually request a completion
         trigger = nil,
+        -- toggle auto-completion on and off
+        toggle = nil,
     },
-    -- Show the ghost text even when a completion menu is visible.
-    show_on_completion_menu = false,
     -- What the ghost text shows. 'line' shows the rest of the current line,
     -- or the line below the cursor when the completion starts with a
     -- newline. 'chunk' shows only the next chunk, exactly what the
-    -- accept-chunk keymap will complete.
+    -- accept keymap will complete.
     ---@type 'line' | 'chunk'
     display = 'line',
     -- When requests fire. 'on_type' requests only after a character was
@@ -213,6 +212,10 @@ local M = {
     ---@type 'on_type' | 'on_insert'
     completion_trigger = 'on_type',
     provider = 'openai_fim_compatible',
+    -- Only llama_cpp_managed and openai_fim_compatible are tested. Other
+    -- providers are kept for compatibility and warn on setup unless this is
+    -- true.
+    allow_unsupported_providers = false,
     -- the maximum total characters of the context before and after the cursor
     -- 16000 characters typically equate to approximately 4,000 tokens for
     -- LLMs.

@@ -141,7 +141,7 @@ The completion is a character stream: the model keeps appending tokens to the
 back while you take from the front. The visible suggestion is always the part
 you have not taken yet, and it is redrawn on every token.
 
-- **Tab** (`accept_chunk`) accepts one chunk. A chunk walk consumes
+- **Tab** (`accept`) accepts one chunk. A chunk walk consumes
   alphanumeric characters and underscores; the first special character
   switches to terminating mode, in which the next alphanumeric character ends
   the chunk. A newline ends the chunk unless it is the first character (the
@@ -157,24 +157,18 @@ you have not taken yet, and it is redrawn on every token.
   something different dismisses it and starts a fresh request.
 - When a chunk would cross a newline in the middle, it stops first — you never
   accept text the view did not show.
-- `accept_line` takes the whole visible line; `accept_n_lines` takes any
-  number, prompting for a count.
+- `accept_line` takes the whole visible line.
+- A `toggle` keymap switches automatic completion on and off (same as
+  `:Harmonize virtualtext toggle`).
 - `action.trigger` requests a completion on demand — useful in `'on_type'`
   mode after navigating somewhere; bind it in `keymap` if you want a key.
 
 ### Keymaps
 
-Defaults (`keymap`):
-
-| Key | Action |
-| --- | --- |
-| `<Tab>` | accept one chunk |
-| `<M-A>` | accept the whole completion |
-| `<M-a>` | accept one line |
-| `<M-z>` | accept n lines (prompts for count) |
-| `<M-e>` | dismiss |
-
-All of them can be set to `nil` or rebound in `keymap`.
+Only `<Tab>` is bound by default — it accepts one chunk. The other actions
+are unbound and can be wired through `keymap`: `accept_line` (accept the
+visible line), `dismiss`, `trigger` (manually request a completion), and
+`toggle` (toggle auto-completion).
 
 ## Configuration
 
@@ -186,25 +180,29 @@ default_config = {
     -- Filetypes to exclude when auto_trigger_ft = { '*' }
     auto_trigger_ignore_ft = {},
     keymap = {
-        accept = nil,
+        -- accept one chunk: the current identifier plus the special
+        -- characters that follow it
+        accept = '<Tab>',
+        -- accept the visible line
         accept_line = nil,
-        accept_chunk = '<Tab>',
-        accept_n_lines = nil,
+        -- dismiss the ghost text
         dismiss = nil,
         -- manually request a completion
         trigger = nil,
+        -- toggle auto-completion on and off
+        toggle = nil,
     },
-    -- Keep the ghost text visible while another completion menu is open.
-    show_on_completion_menu = false,
     -- What the ghost text shows: 'line' shows the rest of the current line
-    -- (the line below when the completion starts with a newline); 'chunk'
-    -- shows only the next chunk, exactly what the accept-chunk keymap will
+    -- shows only the next chunk, exactly what the accept keymap will
     -- complete.
     display = 'line',
     -- When requests fire: 'on_type' only after a character was typed,
     -- 'on_insert' on any pause in insert mode.
     completion_trigger = 'on_type',
     provider = 'openai_fim_compatible',
+    -- Only llama_cpp_managed and openai_fim_compatible are tested. Other
+    -- providers warn on setup unless this is true.
+    allow_unsupported_providers = false,
     -- Maximum characters of context before and after the cursor (~4 tokens
     -- per 100 chars for most LLMs).
     context_window = 16000,
@@ -301,6 +299,12 @@ require('harmonize').setup {
 ## Providers
 
 Set `provider` in the config; the default is `openai_fim_compatible`.
+
+Only `llama_cpp_managed` (see [Quick Start](#quick-start)) and
+`openai_fim_compatible` are tested and maintained. The providers below are
+kept for compatibility with minuet-ai.nvim configs but are untested, because
+their paid APIs are not available for testing; using one shows a warning on
+setup unless `allow_unsupported_providers = true`.
 
 <details>
 <summary>OpenAI</summary>
@@ -503,12 +507,11 @@ models, llama.cpp supports raw FIM via its `/v1/completions` endpoint.
 
 ```lua
 {
-    require('harmonize.virtualtext').action.accept, -- accept whole completion
+    require('harmonize.virtualtext').action.accept, -- accept one chunk
     require('harmonize.virtualtext').action.accept_line,
-    require('harmonize.virtualtext').action.accept_chunk,
-    require('harmonize.virtualtext').action.accept_n_lines,
     require('harmonize.virtualtext').action.dismiss,
     require('harmonize.virtualtext').action.trigger, -- manually request a completion
+    require('harmonize.virtualtext').action.toggle_auto_trigger, -- toggle auto-completion
     require('harmonize.virtualtext').action.is_visible,
 }
 ```
