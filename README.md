@@ -199,8 +199,8 @@ default_config = {
     context_window = 16000,
     -- When the context exceeds the window, the ratio kept before the cursor.
     context_ratio = 0.75,
-    throttle = 1000, -- only request every x ms; 0 disables
-    debounce = 400, -- debounce requests by x ms; 0 disables
+    throttle = 0, -- only request every x ms; 0 disables
+    debounce = 200, -- debounce requests by x ms; 0 disables
     -- false, "debug", "verbose", "warn", or "error"
     notify = 'warn',
     -- Request timeout in seconds. With streaming, a timeout cut keeps the

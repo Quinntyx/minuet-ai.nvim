@@ -236,9 +236,9 @@ local M = {
     -- context before cursor will be used. This option should be between 0 and
     -- 1, context_ratio = 0.75 means the ratio will be 3:1.
     context_ratio = 0.75,
-    throttle = 1000, -- only send the request every x milliseconds, use 0 to disable throttle.
+    throttle = 0, -- only send the request every x milliseconds, use 0 to disable throttle.
     -- debounce the request in x milliseconds, set to 0 to disable debounce
-    debounce = 400,
+    debounce = 200,
     -- Control notification display for request status
     -- Notification options:
     -- false: Disable all notifications (use boolean false, not string "false")
