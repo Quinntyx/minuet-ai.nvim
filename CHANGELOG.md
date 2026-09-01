@@ -20,7 +20,7 @@
   that `my_var_name`.
 - Virtual Text: A `toggle` keymap switches automatic completion on and off
   for the current buffer.
-- Providers other than `llama_cpp_managed` and `openai_fim_compatible` are
+- Providers other than `llama_cpp` and `openai_fim_compatible` are
   untested; using one shows a warning on setup unless
   `allow_unsupported_providers = true`.
 
@@ -35,12 +35,14 @@
   `'on_insert'`), `virtualtext.display_singleline` became `display`
   (`'line'` or `'chunk'`), and the remaining virtual text options lost their
   prefix.
-- The `quick_start` option became the `llama_cpp_managed` provider: it
-  starts and wires a local llama.cpp server configured through
-  `provider_options.llama_cpp_managed` (model, host, port, and extra
-  `llama_cpp_flags` appended to the `llama serve` command for everything
-  else). The server is left running when nvim exits by default;
-  `kill_on_exit` stops it on exit.
+- The `quick_start` option became the `llama_cpp` provider plus the
+  `auto_start` namespace. The provider talks to llama.cpp's native
+  `/infill` endpoint, where the server constructs the FIM prompt with the
+  model's own tokens, so the per-model template hack is gone.
+  `auto_start` (on by default; `nil` manages the server yourself) starts a
+  llama.cpp server when none is running at its host and port, configured
+  with the base command, the model, `extra_args` in the style of
+  `curl_extra_args`, and `kill_on_exit`.
 - Suggestion choice cycling was removed along with the `next`/`prev` actions
   and keymaps; the first completion suggestion is used. The manual invoke
   that shared the `next` key moved to a dedicated `trigger` action, bindable

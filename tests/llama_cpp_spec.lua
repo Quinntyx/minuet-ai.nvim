@@ -1,101 +1,123 @@
 local helpers = require 'tests.helpers'
 
+local function with_mocked_job(run)
+    local common = require 'harmonize.backends.common'
+    local original = common.start_job
+    local captured
+
+    common.start_job = function(_, args, value)
+        captured = { args = args, handlers = value }
+        return {}
+    end
+
+    local ok, err = xpcall(function()
+        run(function()
+            return captured
+        end)
+    end, debug.traceback)
+
+    common.start_job = original
+
+    if not ok then
+        error(err, 0)
+    end
+end
+
+local context = {
+    lines_before = 'function add(a, b) {',
+    lines_after = '\n}',
+}
+
+---The request body goes through a temp file referenced as `-d @<file>`.
+local function request_body(args)
+    for i, arg in ipairs(args) do
+        if arg == '-d' then
+            local data_file = args[i + 1]:sub(2) -- strip '@'
+            return vim.json.decode(vim.fn.readfile(data_file)[1])
+        end
+    end
+    error('the request body must be passed to curl')
+end
+
 return {
     {
-        name = 'managed llama.cpp options default to Qwen2.5-Coder-1.5B on port 8012',
+        name = 'llama_cpp streaming sends input_prefix and input_suffix to /infill and accumulates the stream',
         run = function()
-            local root = helpers.setup_root_config()
+            helpers.setup_root_config {
+                before_cursor_filter_length = 0,
+                after_cursor_filter_length = 0,
+            }
 
-            local opts = root.config.provider_options.llama_cpp_managed
-            helpers.expect_equal(opts.model, 'ggml-org/Qwen2.5-Coder-1.5B-Q8_0-GGUF')
-            helpers.expect_equal(opts.host, '127.0.0.1')
-            helpers.expect_equal(opts.port, 8012)
-            helpers.expect_equal(opts.llama_cpp_flags, '')
-            helpers.expect_falsy(opts.kill_on_exit)
+            with_mocked_job(function(get)
+                local backend = helpers.reload 'harmonize.backends.llama_cpp'
+                local updates = {}
+                local result
+
+                backend.complete(context, function(items)
+                    result = items
+                end, function(text)
+                    table.insert(updates, text)
+                end)
+
+                local captured = get()
+                local body = request_body(captured.args)
+                helpers.expect_equal(body.input_prefix, context.lines_before)
+                helpers.expect_equal(body.input_suffix, context.lines_after)
+                helpers.expect_equal(body.stream, true)
+                -- The native endpoint builds the FIM prompt on the server:
+                -- no template keys and no model are sent.
+                helpers.expect_falsy(body.prompt)
+                helpers.expect_falsy(body.suffix)
+                helpers.expect_falsy(body.model)
+
+                -- The provider endpoint is passed through as-is.
+                local end_point_seen = false
+                for _, arg in ipairs(captured.args) do
+                    if arg == 'http://127.0.0.1:8012/infill' then
+                        end_point_seen = true
+                    end
+                end
+                helpers.expect_truthy(end_point_seen, 'the /infill endpoint must be requested')
+
+                local handlers = captured.handlers
+                helpers.expect_truthy(handlers.on_stdout)
+                handlers.on_stdout(nil, 'data: {"content":"turn","stop":false}\r\n')
+                handlers.on_stdout(nil, 'data: {"content":" a + b;","stop":true}\r\n')
+                handlers.on_exit({}, { code = 0 })
+
+                helpers.expect_equal(updates, { 'turn', 'turn a + b;' })
+                helpers.expect_equal(result, { 'turn a + b;' })
+            end)
         end,
     },
     {
-        name = 'server args build the llama serve invocation and append the user flags',
+        name = 'llama_cpp non-streaming reads the content field from the response',
         run = function()
-            helpers.setup_root_config()
+            helpers.setup_root_config {
+                before_cursor_filter_length = 0,
+                after_cursor_filter_length = 0,
+                provider_options = {
+                    llama_cpp = { stream = false },
+                },
+            }
 
-            local llama_cpp = helpers.reload 'harmonize.llama_cpp'
+            with_mocked_job(function(get)
+                local backend = helpers.reload 'harmonize.backends.llama_cpp'
+                local result
 
-            local args = llama_cpp.server_args('llama', {
-                model = 'ggml-org/Qwen2.5-Coder-1.5B-Q8_0-GGUF',
-                host = '127.0.0.1',
-                port = 8012,
-                llama_cpp_flags = '-ngl 99 --ctx-size 8192',
-            })
-            helpers.expect_equal(args, {
-                'serve',
-                '-hf',
-                'ggml-org/Qwen2.5-Coder-1.5B-Q8_0-GGUF',
-                '--host', '127.0.0.1',
-                '--port', '8012',
-                '-ngl', '99',
-                '--ctx-size', '8192',
-            })
+                backend.complete(context, function(items)
+                    result = items
+                end)
 
-            -- The older llama-server binary has no `serve` subcommand, and a
-            -- local GGUF path goes through --model instead of -hf.
-            local args2 = llama_cpp.server_args('llama-server', {
-                model = '/models/qwen.gguf',
-                host = '127.0.0.1',
-                port = 8012,
-                llama_cpp_flags = '',
-            })
-            helpers.expect_equal(args2, {
-                '--model',
-                '/models/qwen.gguf',
-                '--host', '127.0.0.1',
-                '--port', '8012',
-            })
-        end,
-    },
-    {
-        name = 'wiring points the FIM provider at the managed server with the Qwen template',
-        run = function()
-            local root = helpers.setup_root_config()
+                local handlers = get().handlers
+                helpers.expect_falsy(handlers.on_stdout)
+                handlers.on_exit({}, {
+                    code = 0,
+                    stdout = '{"content":"plain"}',
+                })
 
-            local llama_cpp = helpers.reload 'harmonize.llama_cpp'
-            local opts = root.config.provider_options.llama_cpp_managed
-
-            llama_cpp.wire_provider(root.config, opts)
-
-            local fim = root.config.provider_options.openai_fim_compatible
-            helpers.expect_equal(fim.end_point, 'http://127.0.0.1:8012/v1/completions')
-            helpers.expect_equal(fim.api_key, 'TERM')
-            helpers.expect_equal(fim.model, 'Qwen2.5-Coder-1.5B-Q8_0-GGUF')
-            helpers.expect_equal(root.config.provider, 'openai_fim_compatible')
-
-            -- The Qwen template embeds the FIM special tokens in the prompt.
-            helpers.expect_equal(
-                fim.template.prompt('BEFORE', 'AFTER', {}),
-                '<|fim_prefix|>BEFORE<|fim_suffix|>AFTER<|fim_middle|>'
-            )
-            helpers.expect_falsy(fim.template.suffix)
-        end,
-    },
-    {
-        name = 'a non-Qwen managed model keeps the default FIM template',
-        run = function()
-            local root = helpers.setup_root_config()
-
-            local llama_cpp = helpers.reload 'harmonize.llama_cpp'
-            local default_suffix = root.config.provider_options.openai_fim_compatible.template.suffix
-
-            llama_cpp.wire_provider(root.config, {
-                model = '/models/coder.gguf',
-                host = '127.0.0.1',
-                port = 8012,
-                llama_cpp_flags = '',
-            })
-
-            local fim = root.config.provider_options.openai_fim_compatible
-            helpers.expect_equal(fim.end_point, 'http://127.0.0.1:8012/v1/completions')
-            helpers.expect_equal(fim.model, 'coder.gguf')
-            helpers.expect_equal(fim.template.suffix, default_suffix)
+                helpers.expect_equal(result, { 'plain' })
+            end)
         end,
     },
 }

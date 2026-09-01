@@ -15,8 +15,7 @@ function M.setup(config)
 
     M.config = vim.tbl_deep_extend('force', default_config, config or {})
 
-    -- Providers other than llama_cpp_managed (which becomes
-    -- openai_fim_compatible below) and openai_fim_compatible are not
+    -- Providers other than llama_cpp and openai_fim_compatible are not
     -- tested; warn once unless the user opts out.
     local untested_providers = {
         codestral = true,
@@ -29,7 +28,7 @@ function M.setup(config)
         local utils = require 'harmonize.utils'
         utils.notify(
             string.format(
-                'Provider %q is not tested: harmonize is only maintained for llama_cpp_managed and openai_fim_compatible. '
+                'Provider %q is not tested: harmonize is only maintained for llama_cpp and openai_fim_compatible. '
                     .. 'The other providers need paid API keys that are not available for testing. '
                     .. 'Set allow_unsupported_providers = true to silence this warning.',
                 M.config.provider
@@ -39,8 +38,8 @@ function M.setup(config)
         )
     end
 
-    if M.config.provider == 'llama_cpp_managed' then
-        require('harmonize.llama_cpp').ensure(M.config)
+    if M.config.provider == 'llama_cpp' and M.config.auto_start then
+        require('harmonize.auto_start').ensure(M.config)
     end
     require('harmonize.virtualtext').setup()
 end

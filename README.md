@@ -59,73 +59,63 @@ revealed line by line and tokens streamed in as the model generates them.
 
 ## Quick Start
 
-The fastest way to get a local model running is the `llama_cpp_managed`
-provider: it downloads a llama.cpp binary if needed, starts `llama serve` for
-you (the model is pulled from HuggingFace on the first start), and points the
-`openai_fim_compatible` backend at it.
+The fastest way to get a local model running is the `llama_cpp` provider with
+`auto_start`: it downloads a llama.cpp binary if needed, starts `llama serve`
+for you (the model is pulled from HuggingFace on the first start), and points
+the provider's `/infill` endpoint at it.
 
 ```lua
 require('harmonize').setup {
-    provider = 'llama_cpp_managed',
+    provider = 'llama_cpp',
 }
 ```
 
-That defaults to Qwen2.5-Coder-1.5B (FIM-capable, ~1.6 GB). The model, port,
-and advanced server flags are set in `provider_options.llama_cpp_managed`:
+That defaults to Qwen2.5-Coder-1.5B (FIM-capable, ~1.6 GB) on
+`127.0.0.1:8012`. The server is configured on `auto_start`:
 
 ```lua
 require('harmonize').setup {
-    provider = 'llama_cpp_managed',
-    provider_options = {
-        llama_cpp_managed = {
-            -- any HuggingFace GGUF repo, or a local .gguf path
-            model = 'ggml-org/Qwen2.5-Coder-0.6B-Q4_K_M-GGUF',
-            port = 8012, -- the endpoint becomes http://127.0.0.1:8012/v1/completions
-            -- anything else the server should run with, appended verbatim
-            -- to the `llama serve` command (GPU offload, context size, ...)
-            llama_cpp_flags = '-ngl 99 --ctx-size 8192',
-        },
+    provider = 'llama_cpp',
+    auto_start = {
+        -- any HuggingFace GGUF repo, or a local .gguf path
+        model = 'ggml-org/Qwen2.5-Coder-0.6B-Q4_K_M-GGUF',
+        host = '127.0.0.1',
+        port = 8012,
+        -- extra arguments in the style of curl_extra_args (GPU offload,
+        -- context size, ...)
+        extra_args = { '-ngl', '99', '--ctx-size', '8192' },
     },
 }
 ```
+
+Keep `provider_options.llama_cpp.end_point` in sync with the host and port;
+the defaults already agree.
 
 If `llama` or `llama-server` is already on PATH, it is used as is; otherwise
 one is downloaded. The first start downloads the model, so the first request
 may fail until it is ready.
 
 By default the server keeps running after nvim exits, so the next launch
-reuses it without reloading the model. Set `kill_on_exit = true` in
-`provider_options.llama_cpp_managed` to stop it when nvim exits — but with
+reuses it without reloading the model. Set `kill_on_exit = true` on
+`auto_start` to stop it when nvim exits — but with
 several nvim instances sharing one server, the first one to exit would kill
 it for everyone.
 
-Prefer your own setup? Point the provider at a server you manage:
+Prefer your own setup? Set `auto_start = nil` and point the provider at a
+server you manage — you still get llama.cpp's native `/infill` endpoint,
+which constructs the FIM prompt from the model's own tokens (no per-model
+template needed):
 
 ```lua
 require('harmonize').setup {
-    provider = 'openai_fim_compatible',
-    context_window = 512, -- small for local inference; raise it if your machine keeps up
+    provider = 'llama_cpp',
+    auto_start = nil,
     provider_options = {
-        openai_fim_compatible = {
-            api_key = 'TERM', -- non-null placeholder; local servers ignore it
-            name = 'Llama.cpp',
-            end_point = 'http://localhost:8012/v1/completions',
-            model = 'PLACEHOLDER', -- set by the llama.cpp server at launch
+        llama_cpp = {
+            end_point = 'http://localhost:8012/infill',
             optional = {
-                max_tokens = 256, -- the stream cap; the first chunk arrives fast anyway
+                n_predict = 256, -- the stream cap; the first chunk arrives fast anyway
                 top_p = 0.9,
-            },
-            -- llama.cpp has no suffix option in FIM, so embed the Qwen2.5-Coder
-            -- FIM special tokens directly in the prompt.
-            template = {
-                prompt = function(context_before_cursor, context_after_cursor, _)
-                    return '<|fim_prefix|>'
-                        .. context_before_cursor
-                        .. '<|fim_suffix|>'
-                        .. context_after_cursor
-                        .. '<|fim_middle|>'
-                end,
-                suffix = false,
             },
         },
     },
@@ -200,7 +190,7 @@ default_config = {
     -- 'on_insert' on any pause in insert mode.
     completion_trigger = 'on_type',
     provider = 'openai_fim_compatible',
-    -- Only llama_cpp_managed and openai_fim_compatible are tested. Other
+    -- Only llama_cpp and openai_fim_compatible are tested. Other
     -- providers warn on setup unless this is true.
     allow_unsupported_providers = false,
     -- Maximum characters of context before and after the cursor (~4 tokens
@@ -225,11 +215,13 @@ default_config = {
     proxy = nil,
     -- A list of predicates; auto-completion fires only while all return true.
     enable_predicates = {},
+    -- Start (or reuse) a llama.cpp server for the llama_cpp provider;
+    -- see the Quick Start section. Set to nil to run the server yourself.
+    auto_start = { ... },
     provider_options = {
-        -- server options for the managed llama.cpp provider; see the
-        -- Quick Start section
-        llama_cpp_managed = { ... },
-        -- see the Providers section for the other providers' defaults
+        -- see the Quick Start section for llama_cpp and the Providers
+        -- section for the other providers' defaults
+        llama_cpp = { ... },
     },
     -- Prompt specs for chat models; see the Prompt section.
     default_system = { ... },
@@ -300,7 +292,7 @@ require('harmonize').setup {
 
 Set `provider` in the config; the default is `openai_fim_compatible`.
 
-Only `llama_cpp_managed` (see [Quick Start](#quick-start)) and
+Only `llama_cpp` (see [Quick Start](#quick-start)) and
 `openai_fim_compatible` are tested and maintained. The providers below are
 kept for compatibility with minuet-ai.nvim configs but are untested, because
 their paid APIs are not available for testing; using one shows a warning on
@@ -449,8 +441,9 @@ Disabling thinking for reasoning models:
 
 Any provider compatible with the OpenAI text `/completions` endpoint (not
 `/chat/completions`), so system prompts and few-shot examples do not apply.
-Examples: Ollama at `http://localhost:11434/v1/completions`, llama.cpp at
-`http://localhost:8012/v1/completions`, DeepSeek's beta completions endpoint.
+Examples: Ollama at `http://localhost:11434/v1/completions`, DeepSeek's beta
+completions endpoint. For llama.cpp prefer the native `llama_cpp` provider
+(see [Quick Start](#quick-start)), which uses the `/infill` endpoint.
 
 For Ollama, verify the model template supports FIM: `qwen2.5-coder` does;
 `deepseek-coder` does not — use `deepseek-coder-v2` instead.
@@ -490,7 +483,7 @@ fast models.
 
 Latency (time to first token) matters more than throughput for completion.
 Ideally latency stays under ~1s with throughput above ~100 tokens/s. For local
-models, llama.cpp supports raw FIM via its `/v1/completions` endpoint.
+models, the `llama_cpp` provider uses llama.cpp's native `/infill` endpoint.
 
 ## Commands
 

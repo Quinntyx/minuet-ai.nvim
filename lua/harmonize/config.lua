@@ -212,10 +212,29 @@ local M = {
     ---@type 'on_type' | 'on_insert'
     completion_trigger = 'on_type',
     provider = 'openai_fim_compatible',
-    -- Only llama_cpp_managed and openai_fim_compatible are tested. Other
+    -- Only llama_cpp and openai_fim_compatible are tested. Other
     -- providers are kept for compatibility and warn on setup unless this is
     -- true.
     allow_unsupported_providers = false,
+    -- Start a llama.cpp server for the llama_cpp provider when none is
+    -- running at the host and port below. Set to nil to run the server
+    -- yourself and point provider_options.llama_cpp.end_point at it.
+    auto_start = {
+        -- The base command. The binary is looked up on PATH; a downloaded
+        -- llama.cpp release is used when it is missing.
+        cmd = 'llama serve',
+        -- A Hugging Face GGUF repo or a local model file.
+        model = 'ggml-org/Qwen2.5-Coder-1.5B-Q8_0-GGUF',
+        -- Extra command-line arguments, in the style of curl_extra_args.
+        ---@type string[] | fun(): string[]
+        extra_args = {},
+        -- Stop the server when nvim exits.
+        kill_on_exit = false,
+        -- Where the server listens; keep
+        -- provider_options.llama_cpp.end_point in sync.
+        host = '127.0.0.1',
+        port = 8012,
+    },
     -- the maximum total characters of the context before and after the cursor
     -- 16000 characters typically equate to approximately 4,000 tokens for
     -- LLMs.
@@ -300,20 +319,21 @@ M.default_fim_template = {
 }
 
 M.provider_options = {
-    llama_cpp_managed = {
-        -- The HuggingFace GGUF repo (or a local .gguf file path) hosted by
-        -- the managed llama.cpp server.
-        model = 'ggml-org/Qwen2.5-Coder-1.5B-Q8_0-GGUF',
-        host = '127.0.0.1',
-        port = 8012,
-        -- Extra flags appended verbatim to the `llama serve` command, for
-        -- everything the options above do not cover (GPU offload, context
-        -- size, batch sizes, ...), e.g. '-ngl 99 --ctx-size 8192'.
-        llama_cpp_flags = '',
-        -- Stop the managed server when nvim exits. Off by default so the
-        -- server is left running and the next nvim launch reuses it without
-        -- reloading the model.
-        kill_on_exit = false,
+    llama_cpp = {
+        -- llama.cpp's native fill-in-the-middle endpoint: the server
+        -- constructs the FIM prompt with the model's own tokens, so no
+        -- per-model template is needed.
+        end_point = 'http://127.0.0.1:8012/infill',
+        -- Set to the name of an environment variable holding the key when
+        -- the server runs with --api-key.
+        api_key = nil,
+        name = 'llama.cpp',
+        stream = true,
+        -- Extra JSON body fields for the /infill request, e.g.
+        -- { n_predict = 256, cache_reuse = 256 }.
+        optional = {},
+        -- a list of functions to transform the endpoint, header, and request body
+        transform = {},
     },
     codestral = {
         model = 'codestral-latest',

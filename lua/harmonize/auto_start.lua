@@ -1,7 +1,10 @@
--- Runs a local llama.cpp server for the llama_cpp_managed provider, so a
--- first-time setup needs no manual server management. The server starts when
--- nvim launches; by default it is left running when nvim exits so the next
--- launch can reuse it, or it can be stopped on exit with kill_on_exit.
+-- Starts a llama.cpp server for the llama_cpp provider when none is running
+-- at the configured host and port, so a first-time setup needs no manual
+-- server management. The server starts when nvim launches; by default it is
+-- left running when nvim exits so the next launch can reuse it, or it can be
+-- stopped on exit with kill_on_exit.
+local utils = require 'harmonize.utils'
+
 local M = {}
 
 local data_dir = vim.fn.stdpath('data') .. '/harmonize'
@@ -114,63 +117,45 @@ function M.download_binary(version, then_fn)
     end)
 end
 
----Build the server command: unified `llama serve` vs `llama-server`, the
----HF repo vs a local GGUF file for the model, then the user's extra flags.
----@param binary string
----@param opts table the provider_options.llama_cpp_managed options
----@return string[]
-function M.server_args(binary, opts)
-    local args = {}
-    if vim.fn.fnamemodify(binary, ':t') == 'llama' then
-        table.insert(args, 'serve')
+---Build the server command from the base command in `opts.cmd`, the model
+---(a Hugging Face repo id or a local file), the host and port to listen on,
+---and the extra arguments.
+---@param opts table the auto_start options
+---@param host string
+---@param port integer
+---@return string[]? cmd nil when the binary could not be resolved
+function M.server_cmd(opts, host, port)
+    local words = vim.split(opts.cmd, '%s+', { trimempty = true })
+    local binary = words[1]
+
+    if vim.fn.executable(binary) ~= 1 then
+        -- The binary leading the command is not on PATH; fall back to a
+        -- downloaded llama.cpp release.
+        binary = M.resolve_binary()
+        if not binary then
+            return nil
+        end
+        words[1] = binary
+        -- The downloaded `llama` binary needs its `serve` subcommand; an
+        -- explicit `llama-server` binary does not.
+        if vim.fn.fnamemodify(binary, ':t') == 'llama' and not vim.tbl_contains(words, 'serve') then
+            table.insert(words, 2, 'serve')
+        end
     end
 
     if opts.model:match '^[^/]+/[^/]+$' then
-        table.insert(args, '-hf')
-        table.insert(args, opts.model)
+        vim.list_extend(words, { '-hf', opts.model })
     else
-        table.insert(args, '--model')
-        table.insert(args, opts.model)
+        vim.list_extend(words, { '--model', opts.model })
     end
 
-    table.insert(args, '--host')
-    table.insert(args, opts.host)
-    table.insert(args, '--port')
-    table.insert(args, tostring(opts.port))
+    vim.list_extend(words, { '--host', host, '--port', tostring(port) })
+    vim.list_extend(words, utils.get_or_eval_value(opts.extra_args) or {})
 
-    for flag in opts.llama_cpp_flags:gmatch '%S+' do
-        table.insert(args, flag)
-    end
-
-    return args
+    return words
 end
 
----Point the openai_fim_compatible options at the managed server. Qwen models
----have no server-side suffix option in FIM, so their special tokens are
----embedded in the prompt instead.
----@param config table the merged harmonize config
----@param opts table the provider_options.llama_cpp_managed options
-function M.wire_provider(config, opts)
-    local fim = config.provider_options.openai_fim_compatible
-    fim.end_point = ('http://%s:%d/v1/completions'):format(opts.host, opts.port)
-    fim.api_key = 'TERM'
-    fim.model = opts.model:match '[^/]+$'
-    if opts.model:lower():find 'qwen' then
-        fim.template = {
-            prompt = function(context_before_cursor, context_after_cursor, _)
-                return '<|fim_prefix|>'
-                    .. context_before_cursor
-                    .. '<|fim_suffix|>'
-                    .. context_after_cursor
-                    .. '<|fim_middle|>'
-            end,
-            suffix = false,
-        }
-    end
-    config.provider = 'openai_fim_compatible'
-end
-
-local function server_health(opts)
+local function server_health(host, port)
     if not has_curl() then
         -- Without a probe we assume the server is down and try to start it;
         -- the failure message then tells the user why that could not work.
@@ -181,7 +166,7 @@ local function server_health(opts)
         '-fsS',
         '--max-time',
         '2',
-        ('http://%s:%d/health'):format(opts.host, opts.port),
+        ('http://%s:%d/health'):format(host, port),
     }, { text = true })
     if not ok_handle then
         return false
@@ -191,27 +176,12 @@ local function server_health(opts)
     return result ~= nil and result.code == 0
 end
 
-local function start_server(opts)
-    local binary = M.resolve_binary()
-
-    if not binary then
-        local version = M.latest_release_tag() or fallback_release
-        M.download_binary(version, function()
-            local fresh_binary = M.resolve_binary()
-            if fresh_binary then
-                start_server(opts)
-            end
-        end)
-        return
-    end
-
+local function spawn_server(cmd, opts)
     vim.fn.mkdir(data_dir, 'p')
     local log_file = data_dir .. '/llama-server.log'
-    local cmd = { binary }
-    vim.list_extend(cmd, M.server_args(binary, opts))
 
     local handle_ok, handle = pcall(vim.system, cmd, { detach = true }, function(out)
-        if out.code ~= 0 and not server_health(opts) then
+        if out.code ~= 0 and not server_health(opts.host, opts.port) then
             vim.notify(
                 'llama server exited (code ' .. out.code .. '); see ' .. log_file,
                 vim.log.levels.ERROR
@@ -224,12 +194,12 @@ local function start_server(opts)
     end
 
     if opts.kill_on_exit then
-        api.nvim_create_autocmd('VimLeavePre', {
-            group = api.nvim_create_augroup('HarmonizeManagedServer', { clear = true }),
+        vim.api.nvim_create_autocmd('VimLeavePre', {
+            group = vim.api.nvim_create_augroup('HarmonizeAutoStartServer', { clear = true }),
             callback = function()
                 handle:kill 'sigterm'
             end,
-            desc = 'stop the managed llama.cpp server',
+            desc = 'stop the auto-started llama.cpp server',
         })
     end
 
@@ -239,13 +209,33 @@ local function start_server(opts)
     )
 end
 
----Point the provider at the managed server and make sure it is running.
+local function start_server(opts)
+    local cmd = M.server_cmd(opts, opts.host, opts.port)
+
+    if not cmd then
+        local version = M.latest_release_tag() or fallback_release
+        M.download_binary(version, function()
+            local retry = M.server_cmd(opts, opts.host, opts.port)
+            if retry then
+                spawn_server(retry, opts)
+            end
+        end)
+        return
+    end
+
+    spawn_server(cmd, opts)
+end
+
+---Make sure the llama.cpp server the llama_cpp provider points at is
+---running, starting it when it is not.
 ---@param config table the merged harmonize config
 function M.ensure(config)
-    local opts = config.provider_options.llama_cpp_managed
-    M.wire_provider(config, opts)
+    local opts = config.auto_start
+    if not opts then
+        return
+    end
 
-    if not server_health(opts) then
+    if not server_health(opts.host, opts.port) then
         start_server(opts)
     end
 end
