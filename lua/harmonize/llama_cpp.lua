@@ -1,40 +1,18 @@
--- Downloads and runs a local llama.cpp server for the openai_fim_compatible
--- provider, so a first-time setup needs no manual server management.
---
--- Enabled with `quick_start = true` (or a table with overrides) in setup.
--- This module only manages the server when the provider still points at the
--- cloud default endpoint: as soon as you configure your own end_point, the
--- server is left to you and nothing here touches it.
+-- Runs a local llama.cpp server for the llama_cpp_managed provider, so a
+-- first-time setup needs no manual server management. The server starts when
+-- nvim launches; by default it is left running when nvim exits so the next
+-- launch can reuse it, or it can be stopped on exit with kill_on_exit.
 local M = {}
 
 local data_dir = vim.fn.stdpath('data') .. '/harmonize'
-
-local defaults = {
-    -- HuggingFace repo (or a local GGUF file path) passed to llama.cpp.
-    model = 'ggml-org/Qwen2.5-Coder-1.5B-Q8_0-GGUF',
-    host = '127.0.0.1',
-    port = 8012,
-    context_size = 0, -- 0 = model default (all of it)
-    n_gpu_layers = 99,
-    batch = 1024,
-    ubatch = 1024,
-    cache_reuse = 256,
-    -- llama.cpp release tag for the downloaded binaries. nil resolves the
-    -- newest tag still shipping Linux binaries.
-    release = nil,
-}
 
 -- Release tags before the v0.x scheme published one zip per platform; the
 -- v0.x tags carry no binary assets. When the GitHub API is unreachable this
 -- pinned tag is used instead.
 local fallback_release = 'b4600'
 
-function M.normalize(qs)
-    if qs == true then
-        qs = {}
-    end
-    qs = vim.tbl_deep_extend('force', defaults, qs or {})
-    return qs
+local function has_curl()
+    return vim.fn.executable 'curl' == 1
 end
 
 -- The llama.cpp binary: an installed one wins, otherwise the downloaded
@@ -52,10 +30,6 @@ function M.resolve_binary()
         end
     end
     return nil
-end
-
-local function has_curl()
-    return vim.fn.executable 'curl' == 1
 end
 
 -- Newest tag whose Ubuntu x64 asset still exists; `nil` when the API cannot
@@ -140,61 +114,48 @@ function M.download_binary(version, then_fn)
     end)
 end
 
----Build the server command: unified `llama serve` vs `llama-server`, and the
----HF repo vs a local GGUF file for the model.
+---Build the server command: unified `llama serve` vs `llama-server`, the
+---HF repo vs a local GGUF file for the model, then the user's extra flags.
 ---@param binary string
----@param qs table normalized quick_start options
+---@param opts table the provider_options.llama_cpp_managed options
 ---@return string[]
-function M.server_args(binary, qs)
+function M.server_args(binary, opts)
     local args = {}
     if vim.fn.fnamemodify(binary, ':t') == 'llama' then
         table.insert(args, 'serve')
     end
 
-    if qs.model:match '^[^/]+/[^/]+$' then
+    if opts.model:match '^[^/]+/[^/]+$' then
         table.insert(args, '-hf')
-        table.insert(args, qs.model)
+        table.insert(args, opts.model)
     else
         table.insert(args, '--model')
-        table.insert(args, qs.model)
+        table.insert(args, opts.model)
     end
 
     table.insert(args, '--host')
-    table.insert(args, qs.host)
+    table.insert(args, opts.host)
     table.insert(args, '--port')
-    table.insert(args, tostring(qs.port))
-    table.insert(args, '-ngl')
-    table.insert(args, tostring(qs.n_gpu_layers))
-    table.insert(args, '--ctx-size')
-    table.insert(args, tostring(qs.context_size))
-    table.insert(args, '-b')
-    table.insert(args, tostring(qs.batch))
-    table.insert(args, '-ub')
-    table.insert(args, tostring(qs.ubatch))
-    table.insert(args, '--cache-reuse')
-    table.insert(args, tostring(qs.cache_reuse))
+    table.insert(args, tostring(opts.port))
+
+    for flag in opts.llama_cpp_flags:gmatch '%S+' do
+        table.insert(args, flag)
+    end
+
     return args
 end
 
+---Point the openai_fim_compatible options at the managed server. Qwen models
+---have no server-side suffix option in FIM, so their special tokens are
+---embedded in the prompt instead.
 ---@param config table the merged harmonize config
----@param qs table normalized quick_start options
----@return boolean? true when the provider was pointed at the local server
-function M.wire_provider(config, qs)
+---@param opts table the provider_options.llama_cpp_managed options
+function M.wire_provider(config, opts)
     local fim = config.provider_options.openai_fim_compatible
-    local pristine = vim.deepcopy(require 'harmonize.config')
-        .provider_options.openai_fim_compatible
-
-    if fim.end_point ~= pristine.end_point then
-        -- A custom endpoint means the user runs their own server.
-        return false
-    end
-
-    fim.end_point = ('http://%s:%d/v1/completions'):format(qs.host, qs.port)
+    fim.end_point = ('http://%s:%d/v1/completions'):format(opts.host, opts.port)
     fim.api_key = 'TERM'
-    fim.model = qs.model:match '[^/]+$'
-    if qs.model:lower():find 'qwen' then
-        -- llama.cpp has no suffix option in FIM; embed the Qwen2.5-Coder
-        -- special tokens directly in the prompt.
+    fim.model = opts.model:match '[^/]+$'
+    if opts.model:lower():find 'qwen' then
         fim.template = {
             prompt = function(context_before_cursor, context_after_cursor, _)
                 return '<|fim_prefix|>'
@@ -207,10 +168,9 @@ function M.wire_provider(config, qs)
         }
     end
     config.provider = 'openai_fim_compatible'
-    return true
 end
 
-local function server_health(qs)
+local function server_health(opts)
     if not has_curl() then
         -- Without a probe we assume the server is down and try to start it;
         -- the failure message then tells the user why that could not work.
@@ -221,7 +181,7 @@ local function server_health(qs)
         '-fsS',
         '--max-time',
         '2',
-        ('http://%s:%d/health'):format(qs.host, qs.port),
+        ('http://%s:%d/health'):format(opts.host, opts.port),
     }, { text = true })
     if not ok_handle then
         return false
@@ -231,7 +191,7 @@ local function server_health(qs)
     return result ~= nil and result.code == 0
 end
 
-local function start_server(qs)
+local function start_server(opts)
     local binary = M.resolve_binary()
 
     if not binary then
@@ -239,7 +199,7 @@ local function start_server(qs)
         M.download_binary(version, function()
             local fresh_binary = M.resolve_binary()
             if fresh_binary then
-                start_server(qs)
+                start_server(opts)
             end
         end)
         return
@@ -248,39 +208,49 @@ local function start_server(qs)
     vim.fn.mkdir(data_dir, 'p')
     local log_file = data_dir .. '/llama-server.log'
     local cmd = { binary }
-    vim.list_extend(cmd, M.server_args(binary, qs))
+    vim.list_extend(cmd, M.server_args(binary, opts))
 
     local handle_ok, handle = pcall(vim.system, cmd, { detach = true }, function(out)
-        if out.code ~= 0 and not server_health(qs) then
+        if out.code ~= 0 and not server_health(opts) then
             vim.notify(
                 'llama server exited (code ' .. out.code .. '); see ' .. log_file,
                 vim.log.levels.ERROR
             )
         end
     end)
-    if not handle_ok and handle ~= nil then
+    if not handle_ok then
         vim.notify('failed to start the llama server: ' .. tostring(handle), vim.log.levels.ERROR)
         return
     end
-    vim.notify('starting llama.cpp server on port ' .. qs.port .. ' (first start downloads the model)', vim.log.levels.INFO)
+
+    if opts.kill_on_exit then
+        api.nvim_create_autocmd('VimLeavePre', {
+            group = api.nvim_create_augroup('HarmonizeManagedServer', { clear = true }),
+            callback = function()
+                handle:kill 'sigterm'
+            end,
+            desc = 'stop the managed llama.cpp server',
+        })
+    end
+
+    vim.notify(
+        'starting llama.cpp server on port ' .. opts.port .. ' (first start downloads the model)',
+        vim.log.levels.INFO
+    )
 end
 
-function M.ensure(config, quick_start)
-    local qs = M.normalize(quick_start)
+---Point the provider at the managed server and make sure it is running.
+---@param config table the merged harmonize config
+function M.ensure(config)
+    local opts = config.provider_options.llama_cpp_managed
+    M.wire_provider(config, opts)
 
-    if not M.wire_provider(config, qs) then
-        -- The user manages the endpoint; the server is theirs.
-        return false
+    if not server_health(opts) then
+        start_server(opts)
     end
-
-    if not server_health(qs) then
-        start_server(qs)
-    end
-    return true
 end
 
 -- Exposed for tests.
-M.defaults = defaults
 M.fallback_release = fallback_release
 M.data_dir = data_dir
 

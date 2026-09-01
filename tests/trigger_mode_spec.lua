@@ -8,10 +8,7 @@ local function with_trigger_scenario(overrides, scenario)
         provider = 'test_trigger',
         debounce = 0,
         throttle = 0,
-        virtualtext = {
-            show_on_completion_menu = true,
-            trigger_on_typing = true,
-        },
+        show_on_completion_menu = true,
     }, overrides or {}))
 
     local calls = 0
@@ -139,7 +136,7 @@ return {
         name = 'permissive trigger still requests on insert-enter (legacy mode)',
         run = function()
             with_trigger_scenario({
-                virtualtext = { trigger_on_typing = false },
+                completion_trigger = 'on_insert',
             }, function(_, get_calls)
                 vim.api.nvim_exec_autocmds('InsertEnter', {})
                 helpers.wait_until(function()

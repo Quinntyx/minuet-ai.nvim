@@ -14,9 +14,8 @@ function M.setup(config)
     config.presets = nil
 
     M.config = vim.tbl_deep_extend('force', default_config, config or {})
-
-    if M.config.quick_start then
-        require('harmonize.quickstart').ensure(M.config, M.config.quick_start)
+    if M.config.provider == 'llama_cpp_managed' then
+        require('harmonize.llama_cpp').ensure(M.config)
     end
     require('harmonize.virtualtext').setup()
 end

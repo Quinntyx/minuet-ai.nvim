@@ -2,17 +2,19 @@
 
 ## Features
 
-- Virtual Text: The new `virtualtext.display_singleline` option shows only the
-  remainder of the current line of the completion. When the completion
-  starts with a newline, the next line is shown below the cursor instead of
-  inline to its right, matching where accepting it actually puts it; the
-  rest stays cached so it can still be accepted line by line.
+- Virtual Text: The new `display` option picks what the ghost text shows.
+  `'line'` shows only the remainder of the current line of the completion:
+  when the completion starts with a newline, the next line is shown below the
+  cursor instead of inline to its right, matching where accepting it actually
+  puts it, and the rest stays cached so it can still be accepted line by
+  line. `'chunk'` shows exactly the next chunk the accept-chunk keymap
+  completes.
 - Virtual Text: The new `accept_chunk` action accepts the completion one chunk
   at a time, where a chunk is the current identifier plus the special
   characters that follow it (for example `foo.bar(a, b).baz(c)` is accepted as
   `foo.` `bar(` `a, ` `b).` `baz(` `c)`). A chunk never crosses a newline
   unless the newline is the first character of the completion, matching what
-  the `display_singleline` view shows; a run like `)\n.` is accepted as
+  the line display shows; a run like `)\n.` is accepted as
   `)` and then `\n.`. When the identifier of the current chunk has already
   been typed, the special characters that follow it end that chunk: after
   typing the `r` of `r#my_var_name`, the next chunk is `#` and only after
@@ -24,13 +26,26 @@
   `require('harmonize')`, the user command is `:Harmonize`, and the
   `HarmonizeVirtualText` highlight group and `HarmonizeRequest*` events use
   the new prefix. The repository name will follow.
+- The virtual text options moved to the top level of the config:
+  `virtualtext.trigger_on_typing` became `completion_trigger` (`'on_type'` or
+  `'on_insert'`), `virtualtext.display_singleline` became `display`
+  (`'line'` or `'chunk'`), and the remaining virtual text options lost their
+  prefix.
+- The `quick_start` option became the `llama_cpp_managed` provider: it
+  starts and wires a local llama.cpp server configured through
+  `provider_options.llama_cpp_managed` (model, host, port, and extra
+  `llama_cpp_flags` appended to the `llama serve` command for everything
+  else). The server is left running when nvim exits by default;
+  `kill_on_exit` stops it on exit.
+- Suggestion choice cycling was removed along with the `next`/`prev` actions
+  and keymaps; the first completion suggestion is used.
 
 ## Defaults
 
 - The default provider is now `openai_fim_compatible`, Tab accepts the next
-  chunk (`virtualtext.keymap.accept_chunk = '<Tab>'`), and
-  `virtualtext.display_singleline` defaults to true: install, configure an
-  endpoint, and Tab completes out of the box.
+  chunk (`keymap.accept_chunk = '<Tab>'`), and the ghost text defaults to the
+  single-line display (`display = 'line'`): install, configure an endpoint,
+  and Tab completes out of the box.
 
 ## Streaming
 

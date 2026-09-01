@@ -59,35 +59,45 @@ revealed line by line and tokens streamed in as the model generates them.
 
 ## Quick Start
 
-The fastest way to try it is the built-in quick start: it downloads a
-llama.cpp binary and runs a local server for you (the model is pulled from
-HuggingFace on the first start), then points the `openai_fim_compatible`
-provider at it.
+The fastest way to get a local model running is the `llama_cpp_managed`
+provider: it downloads a llama.cpp binary if needed, starts `llama serve` for
+you (the model is pulled from HuggingFace on the first start), and points the
+`openai_fim_compatible` backend at it.
 
 ```lua
 require('harmonize').setup {
-    quick_start = true,
+    provider = 'llama_cpp_managed',
 }
 ```
 
-That defaults to Qwen2.5-Coder-1.5B (FIM-capable, ~1.6 GB, runs on CPU). Pass
-a table to pick another model or tweak the server:
+That defaults to Qwen2.5-Coder-1.5B (FIM-capable, ~1.6 GB). The model, port,
+and advanced server flags are set in `provider_options.llama_cpp_managed`:
 
 ```lua
 require('harmonize').setup {
-    quick_start = {
-        -- any HuggingFace GGUF repo, or a local .gguf path
-        model = 'ggml-org/Qwen2.5-Coder-0.6B-Q4_K_M-GGUF',
-        port = 8012, -- the endpoint becomes http://127.0.0.1:8012/v1/completions
+    provider = 'llama_cpp_managed',
+    provider_options = {
+        llama_cpp_managed = {
+            -- any HuggingFace GGUF repo, or a local .gguf path
+            model = 'ggml-org/Qwen2.5-Coder-0.6B-Q4_K_M-GGUF',
+            port = 8012, -- the endpoint becomes http://127.0.0.1:8012/v1/completions
+            -- anything else the server should run with, appended verbatim
+            -- to the `llama serve` command (GPU offload, context size, ...)
+            llama_cpp_flags = '-ngl 99 --ctx-size 8192',
+        },
     },
 }
 ```
 
-`quick_start` only takes over when the `openai_fim_compatible` endpoint is
-still the cloud default: configure your own `end_point` and the server is left
-to you. If `llama` or `llama-server` is already on PATH, it is used as is. The
-first start downloads the model, so the first request may fail until it is
-ready.
+If `llama` or `llama-server` is already on PATH, it is used as is; otherwise
+one is downloaded. The first start downloads the model, so the first request
+may fail until it is ready.
+
+By default the server keeps running after nvim exits, so the next launch
+reuses it without reloading the model. Set `kill_on_exit = true` in
+`provider_options.llama_cpp_managed` to stop it when nvim exits — but with
+several nvim instances sharing one server, the first one to exit would kill
+it for everyone.
 
 Prefer your own setup? Point the provider at a server you manage:
 
@@ -140,17 +150,21 @@ you have not taken yet, and it is redrawn on every token.
 - By default, requests fire only after you actually type a character:
   arrow-key moves and scrolling only dismiss a stale suggestion, and entering
   insert mode alone does not trigger a request. Set
-  `virtualtext.trigger_on_typing = false` for the old behavior.
+  `completion_trigger = 'on_insert'` for the old behavior.
+- `display = 'chunk'` shows only the next chunk in the ghost text — exactly
+  what Tab will complete — instead of the rest of the current line.
 - Typing the same characters keeps the remaining suggestion in sync; typing
   something different dismisses it and starts a fresh request.
 - When a chunk would cross a newline in the middle, it stops first — you never
   accept text the view did not show.
 - `accept_line` takes the whole visible line; `accept_n_lines` takes any
   number, prompting for a count.
+- `action.trigger` requests a completion on demand — useful in `'on_type'`
+  mode after navigating somewhere; bind it in `keymap` if you want a key.
 
 ### Keymaps
 
-Defaults (`virtualtext.keymap`):
+Defaults (`keymap`):
 
 | Key | Action |
 | --- | --- |
@@ -158,41 +172,38 @@ Defaults (`virtualtext.keymap`):
 | `<M-A>` | accept the whole completion |
 | `<M-a>` | accept one line |
 | `<M-z>` | accept n lines (prompts for count) |
-| `<M-[>` | previous suggestion / manual invoke |
-| `<M-]>` | next suggestion / manual invoke |
 | `<M-e>` | dismiss |
 
-All of them can be set to `nil` or rebound in `virtualtext.keymap`.
+All of them can be set to `nil` or rebound in `keymap`.
 
 ## Configuration
 
 ```lua
 default_config = {
-    virtualtext = {
-        -- Filetypes for automatic ghost-text completion. Manual completion
-        -- (`<M-[>` / `<M-]>`) still works in any filetype.
-        auto_trigger_ft = {},
-        -- Filetypes to exclude when auto_trigger_ft = { '*' }
-        auto_trigger_ignore_ft = {},
-        keymap = {
-            accept = nil,
-            accept_line = nil,
-            accept_chunk = '<Tab>',
-            accept_n_lines = nil,
-            next = nil,
-            prev = nil,
-            dismiss = nil,
-        },
-        -- Keep the ghost text visible while another completion menu is open.
-        show_on_completion_menu = false,
-        -- Show only the remainder of the current line; when the completion
-        -- starts with a newline, show the line below instead.
-        display_singleline = true,
-        -- Fire a request only after a character was typed. Arrow-key moves
-        -- and scrolling dismiss the ghost text but never request, and
-        -- entering insert mode alone does not trigger either.
-        trigger_on_typing = true,
+    -- Filetypes for automatic ghost-text completion. Manual completion
+    -- still works in any filetype.
+    auto_trigger_ft = {},
+    -- Filetypes to exclude when auto_trigger_ft = { '*' }
+    auto_trigger_ignore_ft = {},
+    keymap = {
+        accept = nil,
+        accept_line = nil,
+        accept_chunk = '<Tab>',
+        accept_n_lines = nil,
+        dismiss = nil,
+        -- manually request a completion
+        trigger = nil,
     },
+    -- Keep the ghost text visible while another completion menu is open.
+    show_on_completion_menu = false,
+    -- What the ghost text shows: 'line' shows the rest of the current line
+    -- (the line below when the completion starts with a newline); 'chunk'
+    -- shows only the next chunk, exactly what the accept-chunk keymap will
+    -- complete.
+    display = 'line',
+    -- When requests fire: 'on_type' only after a character was typed,
+    -- 'on_insert' on any pause in insert mode.
+    completion_trigger = 'on_type',
     provider = 'openai_fim_compatible',
     -- Maximum characters of context before and after the cursor (~4 tokens
     -- per 100 chars for most LLMs).
@@ -217,7 +228,10 @@ default_config = {
     -- A list of predicates; auto-completion fires only while all return true.
     enable_predicates = {},
     provider_options = {
-        -- see the Providers section for each provider's defaults
+        -- server options for the managed llama.cpp provider; see the
+        -- Quick Start section
+        llama_cpp_managed = { ... },
+        -- see the Providers section for the other providers' defaults
     },
     -- Prompt specs for chat models; see the Prompt section.
     default_system = { ... },
@@ -229,9 +243,6 @@ default_config = {
     default_chat_input_prefix_first = { ... },
     -- Config sets for the `Harmonize change_preset` command
     presets = {},
-    -- Download and run a local llama.cpp server automatically; see the
-    -- Quick Start section. `false` disables it.
-    quick_start = false,
 }
 ```
 
@@ -496,9 +507,8 @@ models, llama.cpp supports raw FIM via its `/v1/completions` endpoint.
     require('harmonize.virtualtext').action.accept_line,
     require('harmonize.virtualtext').action.accept_chunk,
     require('harmonize.virtualtext').action.accept_n_lines,
-    require('harmonize.virtualtext').action.next,
-    require('harmonize.virtualtext').action.prev,
     require('harmonize.virtualtext').action.dismiss,
+    require('harmonize.virtualtext').action.trigger, -- manually request a completion
     require('harmonize.virtualtext').action.is_visible,
 }
 ```

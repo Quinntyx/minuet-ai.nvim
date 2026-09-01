@@ -73,9 +73,9 @@ local function get_last_typed_text(ctx)
 end
 
 ---@class harmonize.VirtualtextSuggestionContext
----@field suggestions? string[]
----@field choice? integer
----@field shown_choices? table<string, true>
+---@field suggestion? string The unconsumed completion text.
+---@field shown? boolean Whether a ghost text was rendered for the current
+---suggestion; a pure cursor move only cleans up when something was shown.
 ---@field last_pos integer[]
 ---@field stream? { raw: string, consumed: integer, done: boolean } The completion as a
 -- live character stream: the model appends to `raw` while the user takes from
@@ -84,9 +84,8 @@ end
 
 ---@param ctx harmonize.VirtualtextSuggestionContext
 local function reset_ctx(ctx)
-    ctx.suggestions = nil
-    ctx.choice = nil
-    ctx.shown_choices = nil
+    ctx.suggestion = nil
+    ctx.shown = nil
     ctx.last_pos = nil
     ctx.stream = nil
 end
@@ -107,93 +106,108 @@ end
 ---not taken yet.
 ---@param ctx harmonize.VirtualtextSuggestionContext
 local function refresh_stream_suggestion(ctx)
-    ctx.suggestions = ctx.suggestions or {}
-    ctx.suggestions[1] = ctx.stream.raw:sub(ctx.stream.consumed + 1)
+    ctx.suggestion = ctx.stream.raw:sub(ctx.stream.consumed + 1)
 end
 
 ---@param ctx? harmonize.VirtualtextSuggestionContext
 local function get_current_suggestion(ctx)
     ctx = ctx or get_ctx()
 
-    local ok, choice = pcall(function()
-        if not vim.fn.mode():match '^[iR]' or not ctx.suggestions or #ctx.suggestions == 0 then
-            return nil
-        end
-
-        local choice = ctx.suggestions[ctx.choice]
-
-        return choice
-    end)
-
-    if ok then
-        return choice
+    if not vim.fn.mode():match '^[iR]' or not ctx.suggestion then
+        return nil
     end
 
-    return nil
+    return ctx.suggestion
+end
+
+---Split a suggestion at the next chunk boundary. Walk the suggestion one
+---character at a time: consume alphanumeric characters and underscores, and
+---the first special character switches to terminating mode. In that mode the
+---next alphanumeric character ends the chunk and is excluded from it, so a
+---chunk is one identifier plus the special characters that follow it. When
+---the suggestion starts with special characters, those close out the
+---previous chunk (its identifier was already typed): after typing "r" of
+---"r#my_var_name", the next chunk is "#" and only then "my_var_name".
+---
+---A chunk never crosses a newline unless the newline is the first character
+---of the suggestion. That is the only case in which the line display shows
+---the line below, so accepting a chunk never inserts text the view did
+---not show; a run like ")\n." is split into two chunks (")" and "\n.").
+---Termination rules plug into the character walk, so more elaborate ones (for
+---example skipping a closing quote) can be added later.
+---@param suggestion string
+---@return string, string The next chunk and the remaining suggestion.
+local function split_chunk(suggestion)
+    local terminates = false
+
+    for pos = 1, #suggestion do
+        local byte = suggestion:byte(pos)
+        if byte == 10 then
+            -- A newline may only lead a chunk: it ends the chunk anywhere else.
+            if pos == 1 then
+                terminates = true
+            else
+                return suggestion:sub(1, pos - 1), suggestion:sub(pos)
+            end
+        elseif byte == 95 or (byte >= 48 and byte <= 57) or (byte >= 65 and byte <= 90) or (byte >= 97 and byte <= 122) then
+            -- Alphanumeric or underscore. In terminating mode the chunk ends
+            -- here, leaving this character and the rest for the next chunk.
+            if terminates then
+                return suggestion:sub(1, pos - 1), suggestion:sub(pos)
+            end
+        else
+            -- Any other character switches to terminating mode.
+            terminates = true
+        end
+    end
+
+    return suggestion, ''
 end
 
 ---@param ctx? harmonize.VirtualtextSuggestionContext
 local function update_preview(ctx)
     ctx = ctx or get_ctx()
 
+    local config = require('harmonize').config
     local suggestion = get_current_suggestion(ctx)
-    local display_lines = suggestion and vim.split(suggestion, '\n', { plain = true }) or {}
 
     clear_preview()
 
-    local show_on_completion_menu = require('harmonize').config.virtualtext.show_on_completion_menu
-
-    if not suggestion or #display_lines == 0 or (not show_on_completion_menu and utils.completion_menu_visible()) then
+    if
+        not suggestion
+        or #suggestion == 0
+        or (not config.show_on_completion_menu and utils.completion_menu_visible())
+    then
         return
     end
 
-    if require('harmonize').config.virtualtext.display_singleline and #display_lines > 1 then
-        if display_lines[1] == '' then
-            -- Preserve the empty inline line so the next line renders below
-            -- the cursor, but do not let later streamed lines enter the viewport.
-            display_lines = { '', display_lines[2] }
-        else
-            display_lines = { display_lines[1] }
-        end
-    end
-
-    local annot = ''
-
-    if ctx.suggestions and #ctx.suggestions > 1 then
-        annot = '(' .. ctx.choice .. '/' .. #ctx.suggestions .. ')'
-    end
-
-    local cursor_col = vim.fn.col '.'
-    local cursor_line = vim.fn.line '.'
-
     local extmark = {
         id = internal.extmark_id,
-        virt_text = { { display_lines[1], 'HarmonizeVirtualText' } },
         virt_text_pos = 'inline',
+        hl_mode = 'replace',
     }
 
-    if #display_lines > 1 then
-        extmark.virt_lines = {}
-        for i = 2, #display_lines do
-            extmark.virt_lines[i - 1] = { { display_lines[i], 'HarmonizeVirtualText' } }
+    if config.display == 'chunk' then
+        -- Show exactly what the accept-chunk keymap completes next. A chunk
+        -- that leads with a newline is only that newline and renders empty.
+        extmark.virt_text = { { split_chunk(suggestion):gsub('\n', ''), 'HarmonizeVirtualText' } }
+    else
+        local display_lines = vim.split(suggestion, '\n', { plain = true })
+        if display_lines[1] ~= '' then
+            extmark.virt_text = { { display_lines[1], 'HarmonizeVirtualText' } }
+        elseif display_lines[2] then
+            -- The current line is already complete; show the line below the
+            -- cursor instead.
+            extmark.virt_text = { { '', 'HarmonizeVirtualText' } }
+            extmark.virt_lines = { { { display_lines[2], 'HarmonizeVirtualText' } } }
+        else
+            return
         end
-
-        local last_line = #display_lines - 1
-        if #annot > 0 then
-            extmark.virt_lines[last_line][1][1] = extmark.virt_lines[last_line][1][1] .. ' ' .. annot
-        end
-    elseif #annot > 0 then
-        extmark.virt_text[1][1] = extmark.virt_text[1][1] .. ' ' .. annot
     end
 
-    extmark.hl_mode = 'replace'
+    api.nvim_buf_set_extmark(0, internal.ns_id, vim.fn.line '.' - 1, vim.fn.col '.' - 1, extmark)
 
-    api.nvim_buf_set_extmark(0, internal.ns_id, cursor_line - 1, cursor_col - 1, extmark)
-
-    if not ctx.shown_choices[suggestion] then
-        ctx.shown_choices[suggestion] = true
-    end
-
+    ctx.shown = true
     ctx.last_pos = api.nvim_win_get_cursor(0)
 end
 
@@ -206,9 +220,9 @@ local function cleanup(ctx)
 end
 
 ---@param ctx harmonize.VirtualtextSuggestionContext
----@return boolean Returns true if there are suggestions matching the user’s typed text; otherwise, false.
+---@return boolean Returns true when the typed text continues the current suggestion; otherwise, false.
 local function update_suggestion_on_typing(ctx)
-    if not (ctx and ctx.suggestions and ctx.choice) then
+    if not (ctx and ctx.suggestion) then
         return false
     end
 
@@ -218,7 +232,7 @@ local function update_suggestion_on_typing(ctx)
     end
 
     local typed = table.concat(last_typed_text, '\n')
-    if #typed == 0 or typed ~= ctx.suggestions[ctx.choice]:sub(1, #typed) then
+    if #typed == 0 or typed ~= ctx.suggestion:sub(1, #typed) then
         return false
     end
 
@@ -228,13 +242,7 @@ local function update_suggestion_on_typing(ctx)
         ctx.stream.consumed = ctx.stream.consumed + #typed
         refresh_stream_suggestion(ctx)
     else
-        for i, suggestion in ipairs(ctx.suggestions) do
-            if suggestion:sub(1, #typed) == typed then
-                ctx.suggestions[i] = suggestion:sub(#typed + 1, -1)
-            else
-                ctx.suggestions[i] = ''
-            end
-        end
+        ctx.suggestion = ctx.suggestion:sub(#typed + 1, -1)
     end
 
     update_preview(ctx)
@@ -280,7 +288,7 @@ local function trigger(bufnr)
             -- has taken the rest.
             stream.done = true
             refresh_stream_suggestion(ctx)
-            if #ctx.suggestions[1] == 0 then
+            if not ctx.suggestion or ctx.suggestion == '' then
                 reset_ctx(ctx)
             end
             return
@@ -288,12 +296,8 @@ local function trigger(bufnr)
 
         data = utils.list_dedup(data or {})
 
-        if next(data) then
-            ctx.suggestions = data
-            if not ctx.choice then
-                ctx.choice = 1
-            end
-            ctx.shown_choices = {}
+        if data[1] then
+            ctx.suggestion = data[1]
         end
 
         update_preview(ctx)
@@ -308,29 +312,11 @@ local function trigger(bufnr)
             return
         end
         stream.raw = text
-        if not ctx.choice then
-            ctx.choice = 1
-        end
-        if not ctx.shown_choices then
-            ctx.shown_choices = {}
-        end
         refresh_stream_suggestion(ctx)
         update_preview(ctx)
     end)
 end
 
-local function advance(count, ctx)
-    if ctx ~= get_ctx() then
-        return
-    end
-
-    ctx.choice = (ctx.choice + count) % #ctx.suggestions
-    if ctx.choice < 1 then
-        ctx.choice = #ctx.suggestions
-    end
-
-    update_preview(ctx)
-end
 
 local function schedule()
     if internal.is_on_throttle then
@@ -343,7 +329,7 @@ local function schedule()
     local bufnr = api.nvim_get_current_buf()
 
     internal.timer = vim.defer_fn(function()
-        local show_on_completion_menu = require('harmonize').config.virtualtext.show_on_completion_menu
+        local show_on_completion_menu = require('harmonize').config.show_on_completion_menu
 
         if
             internal.is_on_throttle
@@ -364,73 +350,7 @@ end
 
 local action = {}
 
----Split a suggestion at the next chunk boundary. Walk the suggestion one
----character at a time: consume alphanumeric characters and underscores, and
----the first special character switches to terminating mode. In that mode the
----next alphanumeric character ends the chunk and is excluded from it, so a
----chunk is one identifier plus the special characters that follow it. When
----the suggestion starts with special characters, those close out the
----previous chunk (its identifier was already typed): after typing "r" of
----"r#my_var_name", the next chunk is "#" and only then "my_var_name".
----
----A chunk never crosses a newline unless the newline is the first character
----of the suggestion. That is the only case in which the single-line display
----shows the line below, so accepting a chunk never inserts text the view did
----not show; a run like ")\n." is split into two chunks (")" and "\n.").
----Termination rules plug into the character walk, so more elaborate ones (for
----example skipping a closing quote) can be added later.
----@param suggestion string
----@return string, string The next chunk and the remaining suggestion.
-local function split_chunk(suggestion)
-    local terminates = false
 
-    for pos = 1, #suggestion do
-        local byte = suggestion:byte(pos)
-        if byte == 10 then
-            -- A newline may only lead a chunk: it ends the chunk anywhere else.
-            if pos == 1 then
-                terminates = true
-            else
-                return suggestion:sub(1, pos - 1), suggestion:sub(pos)
-            end
-        elseif byte == 95 or (byte >= 48 and byte <= 57) or (byte >= 65 and byte <= 90) or (byte >= 97 and byte <= 122) then
-            -- Alphanumeric or underscore. In terminating mode the chunk ends
-            -- here, leaving this character and the rest for the next chunk.
-            if terminates then
-                return suggestion:sub(1, pos - 1), suggestion:sub(pos)
-            end
-        else
-            -- Any other character switches to terminating mode.
-            terminates = true
-        end
-    end
-
-    return suggestion, ''
-end
-
-action.next = function()
-    local ctx = get_ctx()
-
-    -- no suggestion request yet
-    if not ctx.suggestions then
-        trigger(api.nvim_get_current_buf())
-        return
-    end
-
-    advance(1, ctx)
-end
-
-action.prev = function()
-    local ctx = get_ctx()
-
-    -- no suggestion request yet
-    if not ctx.suggestions then
-        trigger(api.nvim_get_current_buf())
-        return
-    end
-
-    advance(-1, ctx)
-end
 
 ---@param n_lines? integer Number of lines to accept from the suggestion. If nil, accepts all lines.
 ---Accepts the current suggestion by inserting it at the cursor position.
@@ -444,8 +364,8 @@ function action.accept(n_lines)
         return
     end
 
-    local suggestions = vim.split(suggestion, '\n')
-    local remaining_suggestions = {}
+    local lines = vim.split(suggestion, '\n')
+    local remaining_lines = {}
 
     if n_lines then
         -- NOTE: If the first line is an empty string (""), it indicates that
@@ -454,16 +374,15 @@ function action.accept(n_lines)
         -- the first line, the remaining suggestion may start with '\n'. In
         -- this scenario, we increment n_lines by 1 because the user intends to
         -- accept the next visible line of text, which corresponds to the
-        -- subsequent element in the suggestions list.
-        if suggestions[1] == '' then
+        -- subsequent element in the line list.
+        if lines[1] == '' then
             n_lines = n_lines + 1
         end
-        n_lines = math.min(n_lines, #suggestions)
-        remaining_suggestions = vim.list_slice(suggestions, n_lines + 1, #suggestions)
-        suggestions = vim.list_slice(suggestions, 1, n_lines)
+        n_lines = math.min(n_lines, #lines)
+        remaining_lines = vim.list_slice(lines, n_lines + 1, #lines)
+        lines = vim.list_slice(lines, 1, n_lines)
     end
-
-    if #remaining_suggestions <= 0 then
+    if #remaining_lines <= 0 then
         reset_ctx(ctx)
     end
 
@@ -481,14 +400,14 @@ function action.accept(n_lines)
     end
 
     vim.schedule(function()
-        api.nvim_buf_set_text(0, line, col, line, col, suggestions)
-        local new_col = #suggestions[#suggestions]
+        api.nvim_buf_set_text(0, line, col, line, col, lines)
+        local new_col = #lines[#lines]
         -- For single-line suggestions, adjust the column position by adding the
         -- current column offset
-        if #suggestions == 1 then
+        if #lines == 1 then
             new_col = new_col + col
         end
-        api.nvim_win_set_cursor(0, { line + #suggestions, new_col })
+        api.nvim_win_set_cursor(0, { line + #lines, new_col })
     end)
 end
 
@@ -565,6 +484,11 @@ function action.dismiss()
     cleanup(ctx)
 end
 
+---Manually request a completion for the current context.
+function action.trigger()
+    trigger(api.nvim_get_current_buf())
+end
+
 function action.is_visible()
     return not not api.nvim_buf_get_extmark_by_id(0, internal.ns_id, internal.extmark_id, { details = false })[1]
 end
@@ -589,9 +513,9 @@ end
 
 M.action = action
 
-M.autocmd = autocmd
-
 local autocmd = {}
+
+M.autocmd = autocmd
 
 function autocmd.on_insert_leave()
     cleanup()
@@ -607,7 +531,7 @@ function autocmd.on_insert_enter()
     -- Re-baseline the change tick so the first cursor move inside insert mode
     -- is never mistaken for a freshly typed character.
     internal.last_seen_changedtick = vim.b.changedtick
-    if should_auto_trigger() and not require('harmonize').config.virtualtext.trigger_on_typing then
+    if should_auto_trigger() and require('harmonize').config.completion_trigger == 'on_insert' then
         schedule()
     end
 end
@@ -643,7 +567,7 @@ local function handle_insert_change()
         return true
     end
 
-    if ctx.shown_choices and next(ctx.shown_choices) then
+    if ctx.shown then
         cleanup(ctx)
     end
     if should_auto_trigger() then
@@ -655,12 +579,12 @@ end
 function autocmd.on_cursor_moved_i()
     local config = require('harmonize').config
 
-    if config.virtualtext.trigger_on_typing then
+    if config.completion_trigger == 'on_type' then
         if not handle_insert_change() then
             -- Pure navigation (arrow keys, scrolling): never fire a request;
             -- drop a stale suggestion left at the previous position.
             local ctx = get_ctx()
-            if ctx.shown_choices and next(ctx.shown_choices) then
+            if ctx.shown then
                 cleanup(ctx)
             end
         end
@@ -675,7 +599,7 @@ function autocmd.on_cursor_moved_i()
 
     -- we don't cleanup immediately if the completion has arrived but not
     -- display yet.
-    if ctx.shown_choices and next(ctx.shown_choices) then
+    if ctx.shown then
         cleanup(ctx)
     end
     if should_auto_trigger() then
@@ -684,7 +608,7 @@ function autocmd.on_cursor_moved_i()
 end
 
 function autocmd.on_text_changed_i()
-    if require('harmonize').config.virtualtext.trigger_on_typing then
+    if require('harmonize').config.completion_trigger == 'on_type' then
         handle_insert_change()
     end
 end
@@ -781,23 +705,17 @@ local function set_keymaps(keymap)
         })
     end
 
-    if keymap.next then
-        vim.keymap.set('i', keymap.next, action.next, {
-            desc = '[harmonize.virtualtext] next suggestion',
-            silent = true,
-        })
-    end
-
-    if keymap.prev then
-        vim.keymap.set('i', keymap.prev, action.prev, {
-            desc = '[harmonize.virtualtext] prev suggestion',
-            silent = true,
-        })
-    end
 
     if keymap.dismiss then
         vim.keymap.set('i', keymap.dismiss, action.dismiss, {
             desc = '[harmonize.virtualtext] dismiss suggestion',
+            silent = true,
+        })
+    end
+
+    if keymap.trigger then
+        vim.keymap.set('i', keymap.trigger, action.trigger, {
+            desc = '[harmonize.virtualtext] manually request a completion',
             silent = true,
         })
     end
@@ -807,11 +725,11 @@ function M.setup()
     local config = require('harmonize').config
     api.nvim_clear_autocmds { group = M.augroup }
 
-    if #config.virtualtext.auto_trigger_ft > 0 then
+    if #config.auto_trigger_ft > 0 then
         api.nvim_create_autocmd('FileType', {
-            pattern = config.virtualtext.auto_trigger_ft,
+            pattern = config.auto_trigger_ft,
             callback = function()
-                if not vim.tbl_contains(config.virtualtext.auto_trigger_ignore_ft, vim.bo.ft) then
+                if not vim.tbl_contains(config.auto_trigger_ignore_ft, vim.bo.ft) then
                     vim.b.harmonize_virtual_text_auto_trigger = true
                 end
             end,
@@ -821,7 +739,7 @@ function M.setup()
     end
 
     create_autocmds()
-    set_keymaps(config.virtualtext.keymap)
+    set_keymaps(config.keymap)
 end
 
 return M

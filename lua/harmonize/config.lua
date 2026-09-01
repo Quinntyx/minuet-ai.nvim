@@ -180,53 +180,39 @@ default_chat_input_prefix_first.template =
     '{{{language}}}\n{{{tab}}}\n<contextBeforeCursor>\n{{{context_before_cursor}}}<cursorPosition>\n<contextAfterCursor>\n{{{context_after_cursor}}}'
 
 local M = {
-    virtualtext = {
-        -- Specify the filetypes to enable automatic virtual text completion,
-        -- e.g., { 'python', 'lua' }. Note that you can still invoke manual
-        -- completion even if the filetype is not on your auto_trigger_ft list.
-        auto_trigger_ft = {},
-        -- specify file types where automatic virtual text completion should be
-        -- disabled. This option is useful when auto-completion is enabled for
-        -- all file types i.e., when auto_trigger_ft = { '*' }
-        auto_trigger_ignore_ft = {},
-        keymap = {
-            accept = nil,
-            accept_line = nil,
-            -- accept one chunk (current identifier plus the special
-            -- characters that follow it)
-            accept_chunk = '<Tab>',
-            -- accept n lines (prompts for number)
-            accept_n_lines = nil,
-            -- Cycle to next completion item, or manually invoke completion
-            next = nil,
-            -- Cycle to prev completion item, or manually invoke completion
-            prev = nil,
-            dismiss = nil,
-        },
-        -- Whether to show virtual text suggestion when a
-        -- completion menu is visible.
-        show_on_completion_menu = false,
-        -- Show only the remainder of the current line of the completion.
-        -- When the completion starts with a newline, the current line is
-        -- already complete, so show the line below instead. The rest of the
-        -- completion stays available for further acceptance, which lets you
-        -- accept the completion one visible line at a time.
-        display_singleline = true,
-        -- Fire a completion request only after a character was actually
-        -- typed. Moving the cursor with the arrow keys or scrolling dismisses
-        -- a stale suggestion but never starts a new request, and entering
-        -- insert mode alone does not trigger one either.
-        trigger_on_typing = true,
+    -- Filetypes where automatic completion is enabled, e.g.
+    -- { 'python', 'lua' }. Manual completion still works everywhere.
+    auto_trigger_ft = {},
+    -- Filetypes where automatic completion stays off, useful when
+    -- auto_trigger_ft = { '*' }.
+    auto_trigger_ignore_ft = {},
+    keymap = {
+        accept = nil,
+        accept_line = nil,
+        -- accept one chunk (the current identifier plus the special
+        -- characters that follow it)
+        accept_chunk = '<Tab>',
+        -- accept n lines (prompts for a number)
+        accept_n_lines = nil,
+        dismiss = nil,
+        -- manually request a completion
+        trigger = nil,
     },
+    -- Show the ghost text even when a completion menu is visible.
+    show_on_completion_menu = false,
+    -- What the ghost text shows. 'line' shows the rest of the current line,
+    -- or the line below the cursor when the completion starts with a
+    -- newline. 'chunk' shows only the next chunk, exactly what the
+    -- accept-chunk keymap will complete.
+    ---@type 'line' | 'chunk'
+    display = 'line',
+    -- When requests fire. 'on_type' requests only after a character was
+    -- typed: arrow-key moves and scrolling dismiss the ghost text without
+    -- requesting, and entering insert mode alone does not trigger either.
+    -- 'on_insert' is the old behavior: any pause in insert mode triggers.
+    ---@type 'on_type' | 'on_insert'
+    completion_trigger = 'on_type',
     provider = 'openai_fim_compatible',
-    -- Download and run a local llama.cpp server automatically, so first-time
-    -- setup is just `require('harmonize').setup { quick_start = true }`.
-    -- Accepts a table to override the defaults (the HuggingFace model repo,
-    -- port, and server flags). When the openai_fim_compatible provider
-    -- already has a custom end_point, the server is left to you and the
-    -- endpoint is not touched.
-    ---@type boolean | table
-    quick_start = false,
     -- the maximum total characters of the context before and after the cursor
     -- 16000 characters typically equate to approximately 4,000 tokens for
     -- LLMs.
@@ -311,6 +297,21 @@ M.default_fim_template = {
 }
 
 M.provider_options = {
+    llama_cpp_managed = {
+        -- The HuggingFace GGUF repo (or a local .gguf file path) hosted by
+        -- the managed llama.cpp server.
+        model = 'ggml-org/Qwen2.5-Coder-1.5B-Q8_0-GGUF',
+        host = '127.0.0.1',
+        port = 8012,
+        -- Extra flags appended verbatim to the `llama serve` command, for
+        -- everything the options above do not cover (GPU offload, context
+        -- size, batch sizes, ...), e.g. '-ngl 99 --ctx-size 8192'.
+        llama_cpp_flags = '',
+        -- Stop the managed server when nvim exits. Off by default so the
+        -- server is left running and the next nvim launch reuses it without
+        -- reloading the model.
+        kill_on_exit = false,
+    },
     codestral = {
         model = 'codestral-latest',
         end_point = 'https://codestral.mistral.ai/v1/fim/completions',
