@@ -114,7 +114,6 @@ function M.change_model(provider_model)
     require('harmonize.context').setup()
     vim.notify(string.format('Harmonize model changed to: %s (%s)', model, provider), vim.log.levels.INFO)
 end
-end
 
 function M.change_provider(provider)
     if not M.config then
