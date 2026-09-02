@@ -45,14 +45,15 @@ end
 function M.make_system_prompt(template, n_completion)
     local system_prompt = value.get_or_eval(template.template)
     local n_completion_template = value.get_or_eval(template.n_completion_template)
-    template.template = nil
-    template.n_completion_template = nil
+    local values = vim.tbl_extend('force', {}, template)
+    values.template = nil
+    values.n_completion_template = nil
 
     if type(n_completion_template) == 'string' and type(n_completion) == 'number' then
-        template.n_completion_template = string.format(n_completion_template, n_completion)
+        values.n_completion_template = string.format(n_completion_template, n_completion)
     end
 
-    return M.expand_template(system_prompt, template, value.get_or_eval)
+    return M.expand_template(system_prompt, values, value.get_or_eval)
 end
 
 ---@param context table cursor snapshot
@@ -63,7 +64,8 @@ function M.make_chat_llm_shot(context, template)
     if type(inputs) == 'string' then
         inputs = { inputs }
     end
-    template.template = nil
+    local values = vim.tbl_extend('force', {}, template)
+    values.template = nil
 
     local function eval(entry)
         if type(entry) == 'function' then
@@ -74,7 +76,7 @@ function M.make_chat_llm_shot(context, template)
 
     local results = {}
     for _, input in ipairs(inputs) do
-        table.insert(results, M.expand_template(input, template, eval))
+        table.insert(results, M.expand_template(input, values, eval))
     end
 
     return results

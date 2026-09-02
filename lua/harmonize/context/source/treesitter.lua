@@ -4,6 +4,7 @@
 --- is per buffer, so a delayed refresh for one buffer can never replace the
 --- cached context of another.
 local api = vim.api
+local ContextItem = require 'harmonize.context.item'
 
 --- Node types whose header is sent as context, per language. Used when the
 --- language has no harmonize query file.
@@ -22,6 +23,13 @@ local scope_node_types = {
 
 local max_header_chars = 240
 local debounce_ms = 250
+
+local function close_timer(timer)
+    if timer and not timer:is_closing() then
+        timer:stop()
+        timer:close()
+    end
+end
 
 ---@class harmonize.TreeSitterSource
 local TreeSitterSource = {}
@@ -169,7 +177,7 @@ function TreeSitterSource:render_scopes(bufnr)
     for _, node in ipairs(found) do
         local header = scope_header(node, bufnr)
         if header ~= '' then
-            chunks[#chunks + 1] = require('harmonize.context.item').new('treesitter', {
+            chunks[#chunks + 1] = ContextItem.new('treesitter', {
                 bufnr = bufnr,
                 start_row = node:start(),
                 end_row = node:start() + 1,
@@ -192,7 +200,7 @@ function TreeSitterSource:render_scopes(bufnr)
             end
         end
         if first_row and #vim.tbl_keys(texts) > 0 then
-            chunks[#chunks + 1] = require('harmonize.context.item').new('treesitter', {
+            chunks[#chunks + 1] = ContextItem.new('treesitter', {
                 bufnr = bufnr,
                 start_row = first_row,
                 end_row = last_row + 1,
@@ -242,15 +250,16 @@ end
 ---@param bufnr integer
 function TreeSitterSource:schedule_refresh(bufnr)
     local state = self:state(bufnr)
+    close_timer(state.debounce_timer)
 
-    if state.debounce_timer then
-        state.debounce_timer:again()
-        return
-    end
-
-    state.debounce_timer = vim.uv.new_timer()
-    state.debounce_timer:start(debounce_ms, 0, vim.schedule_wrap(function()
+    local timer = vim.uv.new_timer()
+    state.debounce_timer = timer
+    timer:start(debounce_ms, 0, vim.schedule_wrap(function()
+        if state.debounce_timer ~= timer then
+            return
+        end
         state.debounce_timer = nil
+        close_timer(timer)
         self:refresh(bufnr)
     end))
 end
@@ -288,8 +297,8 @@ function TreeSitterSource:start(augroup)
     api.nvim_create_autocmd('BufWipeout', vim.tbl_extend('force', group, {
         callback = function(args)
             local state = self.buffers[args.buf]
-            if state and state.debounce_timer then
-                state.debounce_timer:stop()
+            if state then
+                close_timer(state.debounce_timer)
             end
             self.buffers[args.buf] = nil
         end,
@@ -310,9 +319,7 @@ end
 
 function TreeSitterSource:reset()
     for _, state in pairs(self.buffers) do
-        if state.debounce_timer then
-            state.debounce_timer:stop()
-        end
+        close_timer(state.debounce_timer)
     end
     self.buffers = {}
 end

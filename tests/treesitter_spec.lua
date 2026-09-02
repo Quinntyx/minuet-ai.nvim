@@ -114,4 +114,21 @@ return {
             helpers.delete_buffer(bufnr)
         end,
     },
+    {
+        name = 'treesitter debounce replaces and closes pending timers',
+        run = function()
+            local Source = helpers.reload 'harmonize.context.source.treesitter'
+            local source = Source.new {}
+
+            source:schedule_refresh(1)
+            local first = source:state(1).debounce_timer
+            source:schedule_refresh(1)
+            local second = source:state(1).debounce_timer
+
+            helpers.expect_truthy(first ~= second)
+            helpers.expect_truthy(first:is_closing(), 'the replaced timer must be closed')
+            source:close()
+            helpers.expect_truthy(second:is_closing(), 'close must close the pending timer')
+        end,
+    },
 }

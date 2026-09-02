@@ -60,7 +60,7 @@ end
 
 ---@param snapshot table completed context snapshot
 ---@param callbacks harmonize.BackendCallbacks
----@return harmonize.Request
+---@return harmonize.Request?
 function LlamaCppBackend:complete(snapshot, callbacks)
     local events = self.deps.events
     local options = self.options
@@ -194,6 +194,9 @@ function LlamaCppBackend:complete(snapshot, callbacks)
             callbacks.on_finish({})
         end,
     })
+    if not request then
+        return nil
+    end
 
     events.run('HarmonizeRequestStarted', {
         provider = self.provider,

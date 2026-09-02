@@ -19,11 +19,16 @@ function View.new(config)
         config = config,
         ns_id = ns_id,
         extmark_id = 1,
+        rendered_bufnr = nil,
     }, View)
 end
 
 function View:clear()
-    pcall(vim.api.nvim_buf_del_extmark, 0, self.ns_id, self.extmark_id)
+    local bufnr = self.rendered_bufnr
+    self.rendered_bufnr = nil
+    if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+        pcall(vim.api.nvim_buf_del_extmark, bufnr, self.ns_id, self.extmark_id)
+    end
 end
 
 --- Whether a ghost text is currently rendered in the current buffer.
@@ -66,7 +71,9 @@ function View:update(session)
         end
     end
 
-    vim.api.nvim_buf_set_extmark(0, self.ns_id, vim.fn.line '.' - 1, vim.fn.col '.' - 1, extmark)
+    local bufnr = vim.api.nvim_get_current_buf()
+    vim.api.nvim_buf_set_extmark(bufnr, self.ns_id, vim.fn.line '.' - 1, vim.fn.col '.' - 1, extmark)
+    self.rendered_bufnr = bufnr
 
     session.shown = true
     session.last_pos = vim.api.nvim_win_get_cursor(0)

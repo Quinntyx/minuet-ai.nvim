@@ -106,7 +106,7 @@ function OpenAiFimBackend:start() end
 
 ---@param snapshot table completed context snapshot
 ---@param callbacks harmonize.BackendCallbacks
----@return harmonize.Request
+---@return harmonize.Request?
 function OpenAiFimBackend:complete(snapshot, callbacks)
     local events = self.deps.events
     local options = self.options
@@ -128,8 +128,11 @@ function OpenAiFimBackend:complete(snapshot, callbacks)
     local headers = {
         ['Content-Type'] = 'application/json',
         ['Accept'] = 'application/json',
-        ['Authorization'] = 'Bearer ' .. self.deps.secret.get_api_key(options.api_key),
     }
+    local api_key = self.deps.secret.get_api_key(options.api_key)
+    if api_key then
+        headers.Authorization = 'Bearer ' .. api_key
+    end
 
     local transformed_data = filter.apply_transforms(options.transform, options.end_point, headers, data)
 
@@ -240,6 +243,9 @@ function OpenAiFimBackend:complete(snapshot, callbacks)
             callbacks.on_finish({})
         end,
     })
+    if not request then
+        return nil
+    end
 
     events.run('HarmonizeRequestStarted', {
         provider = self.provider,

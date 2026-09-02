@@ -160,4 +160,39 @@ return {
             end
         end,
     },
+    {
+        name = 'binary resolution chooses one newest downloaded release path',
+        run = function()
+            local install = helpers.reload 'harmonize.backend.llama_install'
+            local original_executable = vim.fn.executable
+            local original_glob = vim.fn.glob
+            local base = install.data_dir .. '/llama.cpp/'
+
+            local ok, err = xpcall(function()
+                vim.fn.executable = function(name)
+                    if name == 'llama' or name == 'llama-server' then
+                        return 0
+                    end
+                    return 1
+                end
+                vim.fn.glob = function(pattern)
+                    if pattern:match('/bin/llama$') then
+                        return {
+                            base .. 'b900/bin/llama',
+                            base .. 'b1200/bin/llama',
+                        }
+                    end
+                    return {}
+                end
+
+                helpers.expect_equal(install.resolve_binary(), base .. 'b1200/bin/llama')
+            end, debug.traceback)
+
+            vim.fn.executable = original_executable
+            vim.fn.glob = original_glob
+            if not ok then
+                error(err, 0)
+            end
+        end,
+    },
 }

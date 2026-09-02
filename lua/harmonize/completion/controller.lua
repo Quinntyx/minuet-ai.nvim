@@ -2,10 +2,8 @@
 --- stream consumption, and ghost-text rendering for one app instance. All
 --- per-buffer completion state lives in CompletionSession objects owned here.
 local Session = require 'harmonize.completion.session'
-local text = require 'harmonize.text'
 
 local api = vim.api
-local uv = vim.uv or vim.loop
 
 ---@class harmonize.CompletionController
 local Controller = {}
@@ -20,10 +18,11 @@ function Controller.new(deps)
         view = deps.view,
         notify = deps.notify,
         events = deps.events,
+        text = deps.text,
         sessions = {},
         timer = nil,
         is_on_throttle = false,
-        current_completion_timestamp = 0,
+        request_generation = 0,
         -- Typing-only trigger mode distinguishes real typing from pure
         -- navigation: `last_seen_changedtick` remembers the buffer state the
         -- last event processed, and `typing_event_armed` marks that a
@@ -62,26 +61,34 @@ function Controller:cleanup(session)
 end
 
 function Controller:stop_timer()
-    if self.timer and not self.timer:is_closing() then
-        self.timer:stop()
-        self.timer:close()
-        self.timer = nil
+    local timer = self.timer
+    self.timer = nil
+    if timer and not timer:is_closing() then
+        timer:stop()
+        timer:close()
     end
 end
 
 --- Cancel the active backend request, if any.
 function Controller:close_request()
-    if self.request then
-        self.request:cancel()
+    local request = self.request
+    if request then
         self.request = nil
+        self.request_generation = self.request_generation + 1
+        request:cancel()
     end
 end
 
---- Replace the backend (provider switch) and drop any in-flight request.
+--- Replace the backend and drop any in-flight request.
 ---@param backend harmonize.Backend
 function Controller:set_backend(backend)
     self:close_request()
     self.backend = backend
+end
+
+---@param context harmonize.Context
+function Controller:set_context(context)
+    self.context = context
 end
 
 ---@return boolean
@@ -175,23 +182,32 @@ function Controller:trigger(bufnr)
     self.notify.notify('Harmonize virtual text started', 'verbose')
 
     local snapshot = self.context:capture(bufnr)
-
-    local timestamp = uv.now()
-    self.current_completion_timestamp = timestamp
-
     local ctx = self:session(bufnr)
     ctx:start_stream()
     local stream = ctx.stream
 
     self:close_request()
-    self.request = self.backend:complete(snapshot, {
+    self.request_generation = self.request_generation + 1
+    local generation = self.request_generation
+    local finished = false
+    local request
+
+    request = self.backend:complete(snapshot, {
         on_finish = function(data)
-            if timestamp ~= self.current_completion_timestamp then
+            finished = true
+            if generation ~= self.request_generation then
                 if data and next(data) then
                     -- Notify if outdated (and non-empty) completion items arrive.
-                    self.notify.notify('Completion items arrived, but too late, aborted', 'debug', 'info')
+                    self.notify.notify(
+                        'Completion items arrived, but too late, aborted',
+                        'debug',
+                        vim.log.levels.INFO
+                    )
                 end
                 return
+            end
+            if self.request == request then
+                self.request = nil
             end
 
             local current = self:session(bufnr)
@@ -208,7 +224,7 @@ function Controller:trigger(bufnr)
                 return
             end
 
-            data = text.list_dedup(data or {})
+            data = self.text.list_dedup(data or {})
 
             if data[1] then
                 current.suggestion = data[1]
@@ -220,7 +236,7 @@ function Controller:trigger(bufnr)
             -- Each update is the complete response received so far. Replacing
             -- the snapshot keeps rendering independent of token and stdout
             -- chunk sizes.
-            if timestamp ~= self.current_completion_timestamp then
+            if generation ~= self.request_generation then
                 return
             end
             local current = self:session(bufnr)
@@ -231,6 +247,10 @@ function Controller:trigger(bufnr)
             self:refresh_preview(current)
         end,
     })
+
+    if not finished then
+        self.request = request
+    end
 end
 
 --- Debounce a trigger: schedules the request and gates it behind the
@@ -245,7 +265,11 @@ function Controller:schedule()
     local config = self.config
     local bufnr = api.nvim_get_current_buf()
 
-    self.timer = vim.defer_fn(function()
+    local timer
+    timer = vim.defer_fn(function()
+        if self.timer == timer then
+            self.timer = nil
+        end
         if
             self.is_on_throttle
             or self.view:menu_visible()
@@ -261,6 +285,7 @@ function Controller:schedule()
 
         self:trigger(bufnr)
     end, config.debounce)
+    self.timer = timer
 end
 
 --- Insert `lines` at the cursor and move the cursor to the end. The pum is
@@ -314,9 +339,15 @@ function Controller:accept_lines(n_lines)
         return
     end
 
-    local lines = ctx:take_lines(n_lines)
+    local lines, remaining = ctx:take_lines(n_lines)
     self.view:clear()
     insert_lines(lines)
+
+    vim.schedule(function()
+        if #remaining > 0 then
+            self:refresh_preview(ctx)
+        end
+    end)
 end
 
 function Controller:accept_line()
@@ -437,6 +468,7 @@ end
 function Controller:close()
     self:stop_timer()
     self:close_request()
+    self.view:clear()
     self.sessions = {}
 end
 

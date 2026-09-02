@@ -27,9 +27,16 @@ function M.resolve_binary()
     end
 
     for _, rel in ipairs { '/llama.cpp/*/bin/llama', '/llama.cpp/*/bin/llama-server' } do
-        local match = vim.fn.glob(data_dir .. rel)
-        if match ~= '' then
-            return match
+        local best, best_build
+        for _, candidate in ipairs(vim.fn.glob(data_dir .. rel, false, true)) do
+            local build = tonumber(candidate:match('/b(%d+)/')) or -1
+            if vim.fn.executable(candidate) == 1 and (not best_build or build > best_build) then
+                best = candidate
+                best_build = build
+            end
+        end
+        if best then
+            return best
         end
     end
 
@@ -110,7 +117,8 @@ function M.download_binary(version, then_fn)
     vim.notify('Downloading llama.cpp ' .. version .. ' (' .. url .. ')', vim.log.levels.INFO)
     vim.system({ 'curl', '-fL', '--retry', '2', '-o', zip_path, url }, nil, function(out)
         if out.code ~= 0 then
-            vim.notify('llama.cpp download failed (' .. out.code .. '); remove ' .. zip_path .. ' on retry', vim.log.levels.ERROR)
+            vim.uv.fs_unlink(zip_path)
+            vim.notify('llama.cpp download failed (' .. out.code .. ')', vim.log.levels.ERROR)
             return
         end
         vim.system({ 'unzip', '-q', '-o', zip_path, '-d', dest_dir }, nil, function(unzip_out)

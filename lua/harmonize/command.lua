@@ -87,17 +87,19 @@ function M.complete(arglead, cmdline)
         node = node[part]
     end
 
+    local candidates
     if type(node) == 'function' then
-        return vim.tbl_filter(function(item)
-            return vim.startswith(item, arglead)
-        end, node())
+        candidates = node()
     elseif type(node) == 'table' then
-        return vim.tbl_filter(function(item)
-            return vim.startswith(item, arglead)
-        end, vim.tbl_keys(node))
+        candidates = vim.tbl_keys(node)
+    else
+        return {}
     end
 
-    return {}
+    table.sort(candidates)
+    return vim.tbl_filter(function(item)
+        return vim.startswith(item, arglead)
+    end, candidates)
 end
 
 ---@param args { fargs: string[] }
@@ -165,6 +167,7 @@ function M.register()
     vim.api.nvim_create_user_command('Harmonize', M.execute, {
         nargs = '+',
         complete = M.complete,
+        force = true,
     })
 end
 

@@ -103,7 +103,7 @@ function LegacyChatBackend:finish(out, data_file, snapshot, callbacks, get_text_
     local items = filter.parse_completion_items(items_raw, provider_label)
     local before_length, after_length = self:filter_lengths()
     items = filter.filter_against_context(items, snapshot, before_length, after_length)
-    items = require('harmonize.text').trim_completion_items(items)
+    items = self.deps.text.trim_completion_items(items)
 
     callbacks.on_finish(items)
 end
@@ -132,7 +132,7 @@ end
 
 ---@param snapshot table completed context snapshot
 ---@param callbacks harmonize.BackendCallbacks
----@return harmonize.Request
+---@return harmonize.Request?
 function LegacyChatBackend:complete(snapshot, callbacks)
     local events = self.deps.events
     local options = self.options
@@ -216,8 +216,11 @@ function LegacyChatBackend:complete(snapshot, callbacks)
 
         headers = {
             ['Content-Type'] = 'application/json',
-            ['Authorization'] = 'Bearer ' .. self.deps.secret.get_api_key(options.api_key),
         }
+        local api_key = self.deps.secret.get_api_key(options.api_key)
+        if api_key then
+            headers.Authorization = 'Bearer ' .. api_key
+        end
         end_point = options.end_point
         get_text_fn = options.stream and openai_get_text_fn_stream or openai_get_text_fn_no_stream
     end
@@ -258,6 +261,9 @@ function LegacyChatBackend:complete(snapshot, callbacks)
             callbacks.on_finish({})
         end,
     })
+    if not request then
+        return nil
+    end
 
     events.run('HarmonizeRequestStarted', {
         provider = self.provider,

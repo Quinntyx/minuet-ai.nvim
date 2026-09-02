@@ -49,7 +49,7 @@ function App.new(user_config, overrides)
         default_auto_start = defaults.default_auto_start,
     }
     deps.notify.set_level(config.notify)
-    deps.transport = (overrides and overrides.transport) or require('harmonize.transport').new(config)
+    deps.transport = (overrides and overrides.transport) or require('harmonize.transport').new(config, deps)
     deps.backend = (overrides and overrides.backend)
         or require('harmonize.backend').create(config.provider, config, deps)
     deps.context = (overrides and overrides.context) or require('harmonize.context').new(config, deps)
@@ -65,6 +65,8 @@ function App.new(user_config, overrides)
         controller = deps.controller,
         bindings = (overrides and overrides.bindings) or require('harmonize.completion.bindings').new(deps),
         presets = presets,
+        overrides = overrides,
+        started = false,
     }, App)
 
     return self
@@ -73,6 +75,10 @@ end
 --- Register resources: warn about untested providers, start the context
 --- sources and the backend's server, and bind the editor events.
 function App:start()
+    if self.started then
+        return
+    end
+
     local provider = self.config.provider
     if not self.config.allow_unsupported_providers and untested_providers[provider] then
         self.deps.notify.notify(
@@ -92,6 +98,7 @@ function App:start()
     end
     self.backend:start()
     self.bindings:setup()
+    self.started = true
 end
 
 --- Tear down every resource. Idempotent.
@@ -101,6 +108,7 @@ function App:close()
     self.context:close()
     self.backend:close()
     self.deps.transport:close()
+    self.started = false
 end
 
 --- Yield the current snapshot for the buffer, as the controller consumes it.
@@ -110,25 +118,36 @@ function App:capture(bufnr)
     return self.context:capture(bufnr)
 end
 
---- Rebuild the backend and context after a config change (provider, model, or
---- preset). Editor bindings and the view stay; the old backend's request and
---- server handle are dropped like a provider switch.
+--- Rebuild the backend and context after a config change. Bindings are reset
+--- too, so a preset can change keymaps and automatic trigger filetypes.
 function App:rebuild()
+    local was_started = self.started
     self.controller:close_request()
+    self.bindings:close()
 
     if self.backend then
         self.backend:close()
     end
     self.context:close()
 
-    self.deps.backend = require('harmonize.backend').create(self.config.provider, self.config, self.deps)
+    local overrides = self.overrides
+    self.deps.backend = (overrides and overrides.backend)
+        or require('harmonize.backend').create(self.config.provider, self.config, self.deps)
     self.backend = self.deps.backend
     self.controller:set_backend(self.backend)
 
-    if self.config.provider and self.config.provider ~= '' then
-        self.context:start()
+    self.deps.context = (overrides and overrides.context)
+        or require('harmonize.context').new(self.config, self.deps)
+    self.context = self.deps.context
+    self.controller:set_context(self.context)
+
+    if was_started then
+        if self.config.provider and self.config.provider ~= '' then
+            self.context:start()
+        end
+        self.backend:start()
+        self.bindings:setup()
     end
-    self.backend:start()
 end
 
 ---@param provider_model string "provider:model"
@@ -194,9 +213,17 @@ function App:change_preset(preset)
         return
     end
 
-    -- Deep extend the merged config with the preset, then rebuild the
-    -- backend and context.
-    self.config = vim.tbl_deep_extend('force', self.config, preset_config)
+    -- Keep the config table identity stable: transport, controller, view,
+    -- bindings, the public facade, and deps all hold this same table.
+    local merged = vim.tbl_deep_extend('force', {}, self.config, preset_config)
+    for key in pairs(self.config) do
+        self.config[key] = nil
+    end
+    for key, value in pairs(merged) do
+        self.config[key] = value
+    end
+    self.config.presets = nil
+    self.deps.notify.set_level(self.config.notify)
     self:rebuild()
     vim.notify('Harmonize Preset changed to: ' .. preset, vim.log.levels.INFO)
 end

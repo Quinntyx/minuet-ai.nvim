@@ -45,13 +45,9 @@ function ManagedServer:healthy()
 end
 
 function ManagedServer:spawn(cmd)
-    local data_dir = install.data_dir
-    vim.fn.mkdir(data_dir, 'p')
-    local log_file = data_dir .. '/llama-server.log'
-
     local handle_ok, handle = pcall(vim.system, cmd, { detach = true }, vim.schedule_wrap(function(out)
         if out.code ~= 0 and not self:healthy() then
-            vim.notify('llama server exited (code ' .. out.code .. '); see ' .. log_file, vim.log.levels.ERROR)
+            vim.notify('llama server exited with code ' .. out.code, vim.log.levels.ERROR)
         end
     end))
     if not handle_ok then
@@ -65,7 +61,7 @@ function ManagedServer:spawn(cmd)
         vim.api.nvim_create_autocmd('VimLeavePre', {
             group = vim.api.nvim_create_augroup('HarmonizeAutoStartServer', { clear = true }),
             callback = function()
-                handle:kill 'sigterm'
+                pcall(handle.kill, handle, 'sigterm')
             end,
             desc = 'stop the auto-started llama.cpp server',
         })

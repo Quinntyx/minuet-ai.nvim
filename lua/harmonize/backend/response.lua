@@ -24,7 +24,7 @@ function M.no_stream_decode(response, data_file, provider, get_text_fn)
             notify.notify(
                 'Failed to parse ' .. provider .. ' API response as json: ' .. vim.inspect(result),
                 'error',
-                vim.log.levels.INFO
+                vim.log.levels.ERROR
             )
         end
         return
@@ -36,7 +36,7 @@ function M.no_stream_decode(response, data_file, provider, get_text_fn)
 
     if not success or type(result_str) ~= 'string' or result_str == '' then
         if result:find 'error' then
-            notify.notify(provider .. ' returns error: ' .. vim.inspect(result), 'error', vim.log.levels.INFO)
+            notify.notify(provider .. ' returns error: ' .. vim.inspect(result), 'error', vim.log.levels.ERROR)
         else
             notify.notify(provider .. ' returns no text: ' .. vim.inspect(json), 'verbose', vim.log.levels.INFO)
         end
@@ -87,7 +87,7 @@ function M.stream_decode(response, data_file, provider, get_text_fn)
                 notify.notify(
                     provider .. ' returns error on streaming: ' .. vim.inspect(responses),
                     'error',
-                    vim.log.levels.INFO
+                    vim.log.levels.ERROR
                 )
 
                 notified_on_error = true

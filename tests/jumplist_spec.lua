@@ -52,11 +52,13 @@ return {
 
             local inside1 = named_buffer '/proj/one.lua'
             local outside = named_buffer '/elsewhere/two.lua'
+            local sibling = named_buffer '/proj-other/two.lua'
             local inside2 = named_buffer '/proj/three.lua'
 
             local list = {
                 { bufnr = inside1, lnum = 5 },
                 { bufnr = outside, lnum = 6 },
+                { bufnr = sibling, lnum = 6 },
                 { bufnr = inside2, lnum = 7 },
             }
 
@@ -72,6 +74,7 @@ return {
 
             helpers.delete_buffer(inside1)
             helpers.delete_buffer(outside)
+            helpers.delete_buffer(sibling)
             helpers.delete_buffer(inside2)
         end,
     },

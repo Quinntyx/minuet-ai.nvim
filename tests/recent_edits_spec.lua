@@ -131,4 +131,17 @@ return {
             helpers.delete_buffer(bufnr)
         end,
     },
+    {
+        name = 'recent_edits reset keeps attachment ownership for later cleanup',
+        run = function()
+            local source = RecentEditsSource.new(helpers.merged_config().context_sources.recent_edits)
+            source.attached[17] = true
+            source.entries = { { bufnr = 17, extmark_id = 1 } }
+
+            source:reset()
+
+            helpers.expect_equal(source.entries, {})
+            helpers.expect_equal(source.attached, { [17] = true })
+        end,
+    },
 }

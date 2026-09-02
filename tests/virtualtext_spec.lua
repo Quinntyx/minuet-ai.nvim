@@ -201,4 +201,40 @@ return {
             end)
         end,
     },
+    {
+        name = 'accepting a streamed line advances past the inserted text',
+        run = function()
+            local Session = require 'harmonize.completion.session'
+            local session = Session.new()
+            session:start_stream()
+            session:update_raw 'first\nsecond'
+
+            local lines, remaining = session:take_lines(1)
+            helpers.expect_equal(lines, { 'first' })
+            helpers.expect_equal(remaining, { '', 'second' })
+            helpers.expect_equal(session.stream.consumed, 5)
+            helpers.expect_equal(session.suggestion, '\nsecond')
+
+            session:update_raw 'first\nsecond tail'
+            helpers.expect_equal(session.suggestion, '\nsecond tail')
+        end,
+    },
+    {
+        name = 'closing the app clears rendered ghost text',
+        run = function()
+            with_display_scenario(nil, {
+                complete = function(_, _, callbacks)
+                    callbacks.on_finish { 'visible' }
+                end,
+            }, function(bufnr, app)
+                app.controller:trigger(bufnr)
+                helpers.wait_until(function()
+                    return extmark_details(app, bufnr) ~= nil
+                end, 1000, 'the suggestion must be shown')
+
+                app:close()
+                helpers.expect_falsy(extmark_details(app, bufnr), 'close must remove the ghost text')
+            end)
+        end,
+    },
 }

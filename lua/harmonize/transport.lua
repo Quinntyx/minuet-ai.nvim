@@ -1,8 +1,6 @@
 --- Curl-based HTTP transport. Owns the temp request files and the list of
 --- running jobs, so a backend can cancel its current request and the app can
 --- kill everything on teardown.
-local notify = require 'harmonize.notify'
-local value = require 'harmonize.value'
 
 ---@class harmonize.Request
 ---@field cancel fun()
@@ -12,9 +10,12 @@ local Transport = {}
 Transport.__index = Transport
 
 ---@param config table merged harmonize config
-function Transport.new(config)
+---@param deps table shared dependencies
+function Transport.new(config, deps)
     return setmetatable({
         config = config,
+        notify = deps.notify,
+        value = deps.value,
         active = {},
     }, Transport)
 end
@@ -30,7 +31,7 @@ end
 function Transport:write_body_file(content)
     local ok, json = pcall(vim.json.encode, content)
     if not ok then
-        notify.notify('Failed to encode completion request data', 'error', vim.log.levels.ERROR)
+        self.notify.notify('Failed to encode completion request data', 'error', vim.log.levels.ERROR)
         return nil
     end
 
@@ -40,7 +41,7 @@ function Transport:write_body_file(content)
     local write_ok, result = pcall(vim.fn.writefile, { json }, tmp_file, 'bS')
     if not write_ok or result ~= 0 then
         vim.uv.fs_unlink(tmp_file)
-        notify.notify('Cannot write temporary message file: ' .. tmp_file, 'error', vim.log.levels.ERROR)
+        self.notify.notify('Cannot write temporary message file: ' .. tmp_file, 'error', vim.log.levels.ERROR)
         return nil
     end
 
@@ -55,7 +56,7 @@ end
 function Transport:curl_args(end_point, headers, data_file)
     local args = {}
 
-    for _, arg in ipairs(value.get_or_eval(self.config.curl_extra_args) or {}) do
+    for _, arg in ipairs(self.value.get_or_eval(self.config.curl_extra_args) or {}) do
         table.insert(args, arg)
     end
 
@@ -98,14 +99,14 @@ end
 ---@param headers table<string, string>
 ---@param body table|string
 ---@param handlers harmonize.TransportHandlers
----@return harmonize.Request
+---@return harmonize.Request?
 function Transport:post(end_point, headers, body, handlers)
     local data_file = self:write_body_file(body)
     if not data_file then
         if handlers.on_spawn_error then
             handlers.on_spawn_error()
         end
-        return { cancel = function() end }
+        return nil
     end
 
     local cmd = { self.config.curl_cmd }
@@ -119,13 +120,16 @@ function Transport:post(end_point, headers, body, handlers)
     end
 
     local job
+    local done = false
+    local cancelled = false
     local ok, result = pcall(
         vim.system,
         cmd,
         opts,
         vim.schedule_wrap(function(out)
-            for i, j in ipairs(self.active) do
-                if j == job then
+            done = true
+            for i, active_job in ipairs(self.active) do
+                if active_job == job then
                     table.remove(self.active, i)
                     break
                 end
@@ -136,11 +140,11 @@ function Transport:post(end_point, headers, body, handlers)
 
     if not ok then
         vim.uv.fs_unlink(data_file)
-        notify.notify('Failed to start completion job: ' .. result, 'error', vim.log.levels.ERROR)
+        self.notify.notify('Failed to start completion job: ' .. result, 'error', vim.log.levels.ERROR)
         if handlers.on_spawn_error then
             handlers.on_spawn_error()
         end
-        return { cancel = function() end }
+        return nil
     end
 
     job = result
@@ -148,9 +152,20 @@ function Transport:post(end_point, headers, body, handlers)
 
     return {
         cancel = function()
+            if done or cancelled then
+                return
+            end
+            cancelled = true
             local terminated = pcall(job.kill, job, 'sigterm')
-            if not terminated then
-                notify.notify('Failed to terminate completion job', 'warn', vim.log.levels.WARN)
+            if terminated then
+                for i, active_job in ipairs(self.active) do
+                    if active_job == job then
+                        table.remove(self.active, i)
+                        break
+                    end
+                end
+            else
+                self.notify.notify('Failed to terminate completion job', 'warn', vim.log.levels.WARN)
             end
         end,
     }

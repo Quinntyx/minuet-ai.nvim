@@ -37,6 +37,7 @@ local function with_mocked_job(run)
         notify = require 'harmonize.notify',
         events = require 'harmonize.events',
         secret = require 'harmonize.secret',
+        text = require 'harmonize.text',
         transport = {
             post = function(_, endpoint, _headers, body, handlers)
                 local data_file = vim.fn.tempname()
@@ -68,6 +69,7 @@ local function with_mocked_job(run)
                     events = deps.events,
                     secret = deps.secret,
                     transport = deps.transport,
+                    text = deps.text,
                 })
             end,
             get = function()

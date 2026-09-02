@@ -134,29 +134,35 @@ end
 ---@param n_lines? integer
 ---@return string[] lines, string[] remaining_lines
 function Session:take_lines(n_lines)
-    local lines = vim.split(self.suggestion, '\n')
-    local remaining_lines = {}
+    local suggestion = self.suggestion
+    local lines = vim.split(suggestion, '\n', { plain = true })
 
     if n_lines then
-        -- NOTE: If the first line is an empty string (""), it indicates that
-        -- the original suggestion began with a newline character. This
-        -- typically occurs during partial completion: when the user accepts
-        -- the first line, the remaining suggestion may start with '\n'. In
-        -- this scenario, we increment n_lines by 1 because the user intends
-        -- to accept the next visible line of text, which corresponds to the
-        -- subsequent element in the line list.
+        -- A leading empty element represents the newline before the first
+        -- visible line, so accepting one visible line takes two elements.
         if lines[1] == '' then
             n_lines = n_lines + 1
         end
         n_lines = math.min(n_lines, #lines)
-        remaining_lines = vim.list_slice(lines, n_lines + 1, #lines)
         lines = vim.list_slice(lines, 1, n_lines)
     end
 
-    if #remaining_lines <= 0 then
+    local accepted = table.concat(lines, '\n')
+    local remaining = suggestion:sub(#accepted + 1)
+
+    if self.stream then
+        self.stream.consumed = self.stream.consumed + #accepted
+        self:refresh()
+    else
+        self.suggestion = remaining
+    end
+
+    local more = remaining ~= '' or (self.stream and not self.stream.done)
+    if not more then
         self:reset()
     end
 
+    local remaining_lines = remaining == '' and {} or vim.split(remaining, '\n', { plain = true })
     return lines, remaining_lines
 end
 

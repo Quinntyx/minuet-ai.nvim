@@ -10,7 +10,7 @@ local M = {}
 function M.parse_completion_items(items_raw, provider)
     local success, items_table = pcall(vim.split, items_raw, '<endCompletion>')
     if not success then
-        notify.notify('Failed to parse ' .. provider .. "'s content text", 'error', vim.log.levels.INFO)
+        notify.notify('Failed to parse ' .. provider .. "'s content text", 'error', vim.log.levels.ERROR)
         return {}
     end
 

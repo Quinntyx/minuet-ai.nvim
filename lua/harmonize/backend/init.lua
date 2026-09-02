@@ -14,7 +14,7 @@ local M = {}
 ---@class harmonize.Backend
 ---@field new fun(provider: string, config: table, deps: table): harmonize.Backend
 ---@field start fun(self)
----@field complete fun(self, snapshot: table, callbacks: harmonize.BackendCallbacks): harmonize.Request
+---@field complete fun(self, snapshot: table, callbacks: harmonize.BackendCallbacks): harmonize.Request?
 ---@field close fun(self)
 
 --- Trivial backend used when no provider is configured. The completion
@@ -31,7 +31,7 @@ end
 
 function DisabledBackend:start() end
 
-function DisabledBackend:complete(_snapshot, _callbacks)
+function DisabledBackend:complete(_snapshot, callbacks)
     -- 'on_type' fires on every keystroke, so notify only once per session.
     if not self.notified then
         self.notified = true
@@ -41,7 +41,8 @@ function DisabledBackend:complete(_snapshot, _callbacks)
             vim.log.levels.WARN
         )
     end
-    return { cancel = function() end }
+    callbacks.on_finish({})
+    return nil
 end
 
 function DisabledBackend:close() end

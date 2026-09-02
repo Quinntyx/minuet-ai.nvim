@@ -118,6 +118,8 @@ function JumplistSource:select_jumps(list, position, current, overrides)
 
     local selected = {}
     local seen = {}
+    root = vim.fs.normalize(root)
+    local root_prefix = root == '/' and root or root:gsub('/+$', '') .. '/'
 
     for i = position, 1, -1 do
         local entry = list[i]
@@ -129,9 +131,9 @@ function JumplistSource:select_jumps(list, position, current, overrides)
                 -- fnamemodify('', ':p') returns the working directory, so
                 -- unnamed buffers must be skipped before the path is expanded.
                 local keep = raw_name ~= ''
-                local filename = keep and vim.fn.fnamemodify(raw_name, ':p') or ''
+                local filename = keep and vim.fs.normalize(vim.fn.fnamemodify(raw_name, ':p')) or ''
                 if keep and project_only then
-                    keep = filename:sub(1, #root) == root
+                    keep = filename == root or filename:sub(1, #root_prefix) == root_prefix
                 end
                 if keep then
                     seen[key] = true

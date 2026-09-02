@@ -228,19 +228,19 @@ end
 
 --- Detach from every tracked buffer and drop all state.
 function RecentEditsSource:close()
-    for bufnr, attached in pairs(self.attached) do
+    local attached_buffers = self.attached
+    self.attached = {}
+    for bufnr, attached in pairs(attached_buffers) do
         if attached then
             pcall(api.nvim_buf_detach, bufnr)
         end
     end
-    self.attached = {}
     self.entries = {}
 end
 
 --- Test hook: drop all tracked state without detaching.
 function RecentEditsSource:reset()
     self.entries = {}
-    self.attached = {}
 end
 
 return RecentEditsSource
