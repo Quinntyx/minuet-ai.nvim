@@ -613,14 +613,19 @@ provider uses llama.cpp's native `/infill` endpoint.
 
 ## API
 
+### Actions
+
+Bind the editor actions through the `keymap` table at setup:
+
 ```lua
 {
-    require('harmonize.virtualtext').action.accept, -- accept one chunk
-    require('harmonize.virtualtext').action.accept_line,
-    require('harmonize.virtualtext').action.dismiss,
-    require('harmonize.virtualtext').action.trigger, -- manually request a completion
-    require('harmonize.virtualtext').action.toggle_auto_trigger, -- toggle auto-completion
-    require('harmonize.virtualtext').action.is_visible,
+    keymap = {
+        accept = '<Tab>', -- accept one chunk
+        accept_line = '<S-Tab>', -- accept the visible line
+        dismiss = '<C-e>', -- dismiss the ghost text
+        trigger = '<M-y>', -- manually request a completion
+        toggle = '<M-t>', -- toggle auto-completion
+    },
 }
 ```
 

@@ -37,16 +37,16 @@ function LlamaCppBackend:filter_lengths()
 end
 
 function LlamaCppBackend:start()
-    -- The optional auto_start table starts a local llama.cpp server when none
-    -- is already running at the configured host and port.
     local auto_start = self.config.auto_start
     if not auto_start then
         return
     end
 
     local ManagedServer = require 'harmonize.backend.llama_server'
-    local defaults = require('harmonize.config').default_auto_start
-    self.server = ManagedServer.new(vim.tbl_deep_extend('force', defaults, auto_start), self.deps)
+    self.server = ManagedServer.new(
+        vim.tbl_deep_extend('force', self.deps.default_auto_start or {}, auto_start),
+        self.deps
+    )
     self.server:ensure()
 end
 

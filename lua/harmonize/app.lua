@@ -43,6 +43,10 @@ function App.new(user_config, overrides)
         secret = require 'harmonize.secret',
         value = require 'harmonize.value',
         text = require 'harmonize.text',
+        -- Handed to the auto-start feature so the llama_cpp backend can merge
+        -- the user's partial auto_start table over these without reading the
+        -- config module itself.
+        default_auto_start = defaults.default_auto_start,
     }
     deps.notify.set_level(config.notify)
     deps.transport = (overrides and overrides.transport) or require('harmonize.transport').new(config)

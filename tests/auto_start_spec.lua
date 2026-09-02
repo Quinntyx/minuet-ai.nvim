@@ -18,21 +18,42 @@ return {
         end,
     },
     {
-        name = 'a partial auto_start table merges over the defaults',
+        name = 'the llama_cpp backend merges a partial auto_start table over the injected defaults',
         run = function()
-            local config = helpers.merged_config {
-                auto_start = { model = '/models/qwen.gguf' },
+            local original_server = package.loaded['harmonize.backend.llama_server']
+            local captured
+            package.loaded['harmonize.backend.llama_server'] = {
+                new = function(opts, deps)
+                    captured = { opts = opts, deps = deps }
+                    return { ensure = function() end }
+                end,
             }
 
-            -- Mirror the merge ensure() performs.
-            local opts = vim.tbl_deep_extend(
-                'force',
-                require('harmonize.config').default_auto_start,
-                config.auto_start
-            )
-            helpers.expect_equal(opts.cmd, 'llama serve')
-            helpers.expect_equal(opts.model, '/models/qwen.gguf')
-            helpers.expect_equal(opts.port, 8012)
+            local ok, err = xpcall(function()
+                local config = helpers.merged_config {
+                    auto_start = { model = '/models/qwen.gguf' },
+                }
+                local backend = require('harmonize.backend.llama_cpp').new('llama_cpp', config, {
+                    notify = require 'harmonize.notify',
+                    events = require 'harmonize.events',
+                    secret = require 'harmonize.secret',
+                    transport = nil,
+                    default_auto_start = require('harmonize.config').default_auto_start,
+                })
+                backend:start()
+
+                helpers.expect_equal(captured.opts.cmd, 'llama serve')
+                helpers.expect_equal(captured.opts.model, '/models/qwen.gguf')
+                helpers.expect_equal(captured.opts.host, '127.0.0.1')
+                helpers.expect_equal(captured.opts.port, 8012)
+                helpers.expect_equal(captured.opts.kill_on_exit, false)
+            end, debug.traceback)
+
+            package.loaded['harmonize.backend.llama_server'] = original_server
+
+            if not ok then
+                error(err, 0)
+            end
         end,
     },
     {
