@@ -29,11 +29,11 @@ LlamaCppBackend.get_text_fn = function(json)
     return json.content
 end
 
--- FIM providers do not trim duplicated context: the model's own FIM format
--- already puts the cursor context in the prompt.
+-- llama.cpp is not one of the FIM providers with zero filtering: like the
+-- chat providers it trims a little duplicated context by default.
 function LlamaCppBackend:filter_lengths()
-    return value.get_or_eval(self.config.before_cursor_filter_length) or 0,
-        value.get_or_eval(self.config.after_cursor_filter_length) or 0
+    return value.get_or_eval(self.config.before_cursor_filter_length) or 2,
+        value.get_or_eval(self.config.after_cursor_filter_length) or 15
 end
 
 function LlamaCppBackend:start()
