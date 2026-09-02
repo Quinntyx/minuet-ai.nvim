@@ -69,6 +69,10 @@ end
 --- whole node text capped when the grammar has no body field.
 ---@param node table treesitter node
 ---@param bufnr integer
+--- Header of a declaration node: everything before its body starts, or the
+--- whole node text capped when the grammar has no body field.
+---@param node table treesitter node
+---@param bufnr integer
 ---@return string
 local function scope_header(node, bufnr)
     local srow, scol = node:start()
@@ -76,7 +80,21 @@ local function scope_header(node, bufnr)
     if ok and body and body[1] then
         local brow, bcol = body[1]:start()
         if brow > srow or bcol > scol then
-            return (text_between(bufnr, srow, scol, brow, bcol):gsub('%s+$', ''))
+            local header = text_between(bufnr, srow, scol, brow, bcol):gsub('%s+$', '')
+            -- Grains like Rust's function_item start their body at the opening
+            -- brace, which the exclusive cut drops; re-append the brace so the
+            -- header reads like the code in the file.
+            if not header:find('%{%s*$') then
+                local line = api.nvim_buf_get_lines(bufnr, brow, brow + 1, true)[1] or ''
+                local pos = bcol + 1
+                while pos <= #line and (line:byte(pos) == 0x20 or line:byte(pos) == 0x09) do
+                    pos = pos + 1
+                end
+                if line:byte(pos) == 0x7B then -- '{'
+                    header = header .. ' {'
+                end
+            end
+            return header
         end
     end
     return (vim.treesitter.get_node_text(node, bufnr):gsub('%s+$', ''):sub(1, max_header_chars))

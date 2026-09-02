@@ -80,4 +80,36 @@ return {
             helpers.delete_buffer(other)
         end,
     },
+    {
+        name = 'treesitter keeps the opening brace on rust function headers',
+        run = function()
+            if not pcall(vim.treesitter.language.add, 'rust') then
+                return -- skip: no rust parser in this environment
+            end
+
+            local bufnr = helpers.create_buffer({
+                'impl Config {',
+                '  pub fn from_env(&self, x: u32) -> u32 {',
+                '    x + 1',
+                '  }',
+                '}',
+            })
+            vim.bo[bufnr].buftype = ''
+            vim.bo[bufnr].ft = 'rust'
+
+            -- Put the cursor inside the function so both declarations enclose it.
+            vim.api.nvim_win_set_cursor(0, { 3, 4 })
+            local treesitter = refresh(bufnr)
+
+            local texts = {}
+            for _, c in ipairs(treesitter.snapshot(bufnr)) do
+                texts[#texts + 1] = table.concat(c.lines, '\n')
+            end
+
+            helpers.expect_truthy(vim.tbl_contains(texts, 'impl Config {'), 'impl header must keep its brace')
+            helpers.expect_truthy(vim.tbl_contains(texts, 'pub fn from_env(&self, x: u32) -> u32 {'), 'fn header must keep its brace')
+
+            helpers.delete_buffer(bufnr)
+        end,
+    },
 }
