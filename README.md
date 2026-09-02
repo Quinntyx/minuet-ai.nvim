@@ -39,7 +39,10 @@ local llama.cpp setups will live here.
 
 ## Installation
 
-**lazy.nvim**:
+Installing the plugin alone changes nothing: no keys are bound, no ghost
+text appears, and no provider is configured. The snippet below is what turns
+it on — note that it binds `<Tab>` to accept one chunk, so pasting it is a
+deliberate change to your Tab key:
 
 ```lua
 {
@@ -47,6 +50,11 @@ local llama.cpp setups will live here.
     config = function()
         require('harmonize').setup {
             provider = 'llama_cpp',
+            -- ghost text in every filetype
+            auto_trigger_ft = { '*' },
+            keymap = {
+                accept = '<Tab>', -- binds <Tab>: accept one chunk
+            },
             provider_options = {
                 llama_cpp = {
                     end_point = 'http://localhost:8012/infill',
@@ -70,7 +78,8 @@ local llama.cpp setups will live here.
 ## Quick Start
 
 The installation snippet above is a working setup: the `llama_cpp` provider
-talks to llama.cpp's native `/infill` endpoint, and the `auto_start` table
+talks to llama.cpp's native `/infill` endpoint, `auto_trigger_ft` shows the
+ghost text everywhere, `keymap.accept` binds Tab, and the `auto_start` table
 has harmonize start the server for you — it downloads a llama.cpp binary if
 needed, runs `llama serve` with the model (pulled from HuggingFace on the
 first start), and leaves the server running when nvim exits so the next
@@ -114,9 +123,10 @@ For cloud providers, see [Providers](#providers) and [API keys](#api-keys).
 
 ## Sample config
 
-A complete llama.cpp setup. Every field is filled in, so edit the values
-rather than starting from scratch — harmonize deep-merges your config over
-its defaults, so omitting a field keeps the default.
+A complete llama.cpp setup that turns everything on. Every field is filled
+in, so edit the values rather than starting from scratch — harmonize
+deep-merges your config over its defaults, so omitting a field keeps the
+default (and a blank config does nothing at all).
 
 ```lua
 require('harmonize').setup {
@@ -226,8 +236,9 @@ you have not taken yet, and it is redrawn on every token.
 
 ### Keymaps
 
-Only `<Tab>` is bound by default — it accepts one chunk. The other actions
-are unbound and can be wired through `keymap`: `accept_line` (accept the
+Nothing is bound by default — a blank config changes no keybinds. The
+actions are wired through `keymap`: `accept` (accept one chunk — the install
+snippet and sample config bind this to `<Tab>`), `accept_line` (accept the
 visible line), `dismiss`, `trigger` (manually request a completion), and
 `toggle` (toggle auto-completion).
 
@@ -242,8 +253,8 @@ default_config = {
     auto_trigger_ignore_ft = {},
     keymap = {
         -- accept one chunk: the current identifier plus the special
-        -- characters that follow it
-        accept = '<Tab>',
+        -- characters that follow it. Nothing is bound by default.
+        accept = nil,
         -- accept the visible line
         accept_line = nil,
         -- dismiss the ghost text
@@ -260,7 +271,9 @@ default_config = {
     -- When requests fire: 'on_type' only after a character was typed,
     -- 'on_insert' on any pause in insert mode.
     completion_trigger = 'on_type',
-    provider = 'openai_fim_compatible',
+    -- No provider by default: a blank config does nothing until you set
+    -- this. The provider options below still have defaults.
+    provider = nil,
     -- Only llama_cpp and openai_fim_compatible are tested. Other
     -- providers warn on setup unless this is true.
     allow_unsupported_providers = false,

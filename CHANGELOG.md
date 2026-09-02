@@ -57,10 +57,12 @@
 
 ## Defaults
 
-- The default provider is now `openai_fim_compatible`, Tab accepts the next
-  chunk (`keymap.accept = '<Tab>'`), and the ghost text defaults to the
-  single-line display (`display = 'line'`): install, configure an endpoint,
-  and Tab completes out of the box.
+- Installing changes nothing by default: no keys are bound, no ghost text
+  is shown, and no provider is configured. Other defaults (single-line
+  display, typing-only trigger, throttle and debounce) still apply. The
+  README's install snippet turns everything on: the `llama_cpp` provider,
+  Tab bound to accept chunks, ghost text in every filetype, and an
+  auto-started llama.cpp server.
 
 ## Streaming
 

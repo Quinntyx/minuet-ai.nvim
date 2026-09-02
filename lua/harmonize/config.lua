@@ -187,9 +187,10 @@ local M = {
     -- auto_trigger_ft = { '*' }.
     auto_trigger_ignore_ft = {},
     keymap = {
-        -- accept one chunk: the current identifier plus the special
-        -- characters that follow it
-        accept = '<Tab>',
+        -- Nothing is bound by default: a blank config changes no keybinds.
+        -- accept takes one chunk: the current identifier plus the special
+        -- characters that follow it.
+        accept = nil,
         -- accept the visible line
         accept_line = nil,
         -- dismiss the ghost text
@@ -211,7 +212,10 @@ local M = {
     -- 'on_insert' is the old behavior: any pause in insert mode triggers.
     ---@type 'on_type' | 'on_insert'
     completion_trigger = 'on_type',
-    provider = 'openai_fim_compatible',
+    -- No provider is configured by default: a blank config does nothing
+    -- until you set this (see the README's install snippet). The provider
+    -- options below still have defaults.
+    provider = nil,
     -- Only llama_cpp and openai_fim_compatible are tested. Other
     -- providers are kept for compatibility and warn on setup unless this is
     -- true.

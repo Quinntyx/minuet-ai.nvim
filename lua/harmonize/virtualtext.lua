@@ -255,6 +255,19 @@ local function trigger(bufnr)
 
     local config = require('harmonize').config
 
+    if not config.provider or config.provider == '' then
+        -- Notify once per session: 'on_type' fires on every keystroke.
+        if not internal.notified_no_provider then
+            internal.notified_no_provider = true
+            utils.notify(
+                'No provider is configured: set provider in the harmonize setup to enable completions',
+                'warn',
+                vim.log.levels.WARN
+            )
+        end
+        return
+    end
+
     local context = utils.get_context(utils.make_cmp_context())
 
     local provider = require('harmonize.backends.' .. config.provider)

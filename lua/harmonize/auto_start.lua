@@ -236,7 +236,7 @@ function M.ensure(config)
 
     -- A partial auto_start table merges over the defaults, so
     -- auto_start = { model = '...' } is a complete setup.
-    local opts = vim.tbl_deep_extend('force', M.default_auto_start, config.auto_start)
+    local opts = vim.tbl_deep_extend('force', require('harmonize.config').default_auto_start, config.auto_start)
 
     if not server_health(opts.host, opts.port) then
         start_server(opts)
