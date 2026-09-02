@@ -29,7 +29,8 @@
 - The plugin is now called harmonize.nvim: the module is
   `require('harmonize')`, the user command is `:Harmonize`, and the
   `HarmonizeVirtualText` highlight group and `HarmonizeRequest*` events use
-  the new prefix. The repository name will follow.
+  the new prefix. The repository is renamed to `Quinntyx/harmonize.nvim`
+  and `v2` is merged into `main`.
 - The virtual text options moved to the top level of the config:
   `virtualtext.trigger_on_typing` became `completion_trigger` (`'on_type'` or
   `'on_insert'`), `virtualtext.display_singleline` became `display`

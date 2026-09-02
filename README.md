@@ -1,61 +1,51 @@
 # harmonize.nvim
 
-Minimal, streaming-first AI tab completion for Neovim. Install it, point it at
-your endpoint, and Tab completes your code in chunks — with the ghost text
-revealed line by line and tokens streamed in as the model generates them.
-
-> This is the rewritten plugin formerly known as minuet-ai.nvim. The rewrite
-> lives on the `v2` branch of `Quinntyx/minuet-ai.nvim` while the repository is
-> being renamed.
+Streaming AI tab completion for Neovim, rewritten from
+[minuet-ai.nvim](https://github.com/milanglacier/minuet-ai.nvim). Point it at
+an endpoint and Tab completes in chunks, with the ghost text revealed line by
+line as the model generates tokens.
 
 ## Features
 
-- **Virtual text only.** One frontend, no completion-menu integration to
-  configure. Suggestions render inline as ghost text and refresh on every
-  streaming token.
-- **Chunk-wise Tab.** Tab accepts the completion one chunk at a time — the
-  current identifier plus the special characters that follow it. `foo.bar(a,
-  b).baz(c)` is accepted as `foo.` `bar(` `a, ` `b).` `baz(` `c)`.
-- **Line-by-line reveals.** The single-line view shows only the remainder of
-  the current line (or the line below, when the completion starts with a
-  newline), and the rest stays cached so you can accept it one visible line at
-  a time.
-- **Token streaming.** Completions are live character streams: the model
-  appends to the back up to the `max_tokens` cap while you take from the
-  front by typing or pressing Tab. The first chunk appears almost
-  immediately even on slow local models, and a high `max_tokens` no longer
-  means a long wait.
-- **Typing sync.** When your typed text matches the start of a suggestion, the
-  completion tracks your typing instead of being discarded, avoiding
-  unnecessary LLM requests.
-- **Chat and FIM providers.** OpenAI, Claude, Gemini, Codestral, and any
-  OpenAI-compatible chat service, or fill-in-the-middle endpoints (DeepSeek,
-  Ollama, llama.cpp, and others). Switch between them at runtime.
-- **No background binary.** Just `curl` and your preferred LLM provider.
+- Virtual text frontend: suggestions render as ghost text inline and refresh
+  on every streaming token. No completion-menu integration to configure.
+- Chunk-wise acceptance: Tab accepts one chunk at a time (the current
+  identifier plus the special characters that follow it), so long completions
+  arrive in reviewable steps.
+- Single-line display: the ghost shows the rest of the current line (or the
+  line below when the completion starts with a newline); the rest stays
+  cached for further acceptance.
+- Token streaming: the completion is a character stream — the model appends
+  to the back while typing and Tab take from the front, so the first chunk
+  appears quickly even on slow local models.
+- Typing sync: when typed text matches the start of the suggestion, the
+  suggestion advances instead of being discarded and re-requested.
+- `llama_cpp` provider for llama.cpp's native `/infill` endpoint, with
+  optional automatic server startup, and `openai_fim_compatible` for any
+  OpenAI FIM-compatible service. Other providers inherited from
+  minuet-ai.nvim are present but untested.
 
 ## Requirements
 
 - Neovim 0.10+
-- An API key for at least one supported provider (or a local FIM server such
-  as llama.cpp/Ollama)
+- `curl`
+- A completion backend: a llama.cpp server (the `llama_cpp` provider can
+  start one for you) or an OpenAI FIM-compatible endpoint
 
 ## Installation
 
-**Lazy.nvim** (repo path pending the GitHub rename):
+**lazy.nvim**:
 
 ```lua
 {
-    'Quinntyx/minuet-ai.nvim',
-    branch = 'v2',
+    'Quinntyx/harmonize.nvim',
     config = function()
         require('harmonize').setup {
-            -- your configuration here
+            -- see the sample config below
         }
     end,
 }
 ```
-
-**Rocks.nvim**: `Rocks install harmonize.nvim`
 
 ## Quick Start
 
@@ -124,6 +114,90 @@ require('harmonize').setup {
 
 Tab accepts the next chunk out of the box; see the keymap defaults below.
 For cloud providers, see [Providers](#providers) and [API keys](#api-keys).
+
+## Sample config
+
+A complete llama.cpp setup. Every field is filled in, so edit the values
+rather than starting from scratch — harmonize deep-merges your config over
+its defaults, so omitting a field keeps the default.
+
+```lua
+require('harmonize').setup {
+    provider = 'llama_cpp',
+
+    -- What the ghost text shows: 'line' shows the rest of the current line
+    -- (or the line below when the completion starts with a newline);
+    -- 'chunk' shows exactly the next chunk Tab will accept.
+    display = 'line',
+    -- When requests fire: 'on_type' only after a character is typed,
+    -- 'on_insert' on any pause in insert mode.
+    completion_trigger = 'on_type',
+    -- Filetypes where auto-completion fires; use { '*' } for all. Manual
+    -- completion (keymap.trigger) works everywhere either way.
+    auto_trigger_ft = { 'lua', 'python', 'rust' },
+    -- Filetypes to skip when auto_trigger_ft contains '*'.
+    auto_trigger_ignore_ft = {},
+
+    keymap = {
+        accept = '<Tab>',      -- accept one chunk
+        accept_line = '<M-a>', -- accept the visible line
+        dismiss = '<M-e>',     -- dismiss the ghost text
+        trigger = '<M-]>',     -- request a completion now
+        toggle = '<M-c>',      -- toggle auto-completion on and off
+    },
+
+    -- Server startup for the llama_cpp provider: when nothing answers at
+    -- host:port, harmonize runs the command below with the model and leaves
+    -- the server running when nvim exits. Set auto_start = nil to run the
+    -- server yourself and keep provider_options.llama_cpp.end_point pointed
+    -- at it.
+    auto_start = {
+        cmd = 'llama serve', -- binary looked up on PATH; downloaded when missing
+        model = 'ggml-org/Qwen2.5-Coder-1.5B-Q8_0-GGUF', -- HF repo or local .gguf path
+        extra_args = { '-ngl', '99', '--ctx-size', '8192' },
+        kill_on_exit = false,
+        host = '127.0.0.1', -- keep end_point in sync with these two
+        port = 8012,
+    },
+
+    provider_options = {
+        llama_cpp = {
+            end_point = 'http://127.0.0.1:8012/infill',
+            -- api_key = 'LLAMA_API_KEY', -- only for servers run with --api-key
+            name = 'llama.cpp',
+            stream = true,
+            -- Extra JSON fields for the /infill request body.
+            optional = { n_predict = 256, top_p = 0.9 },
+            transform = {},
+        },
+    },
+
+    -- Maximum characters of context before and after the cursor
+    -- (~4000 tokens at 16000 characters).
+    context_window = 16000,
+    -- When the context exceeds the window, the share kept before the cursor
+    -- (0.75 means a 3:1 before/after split).
+    context_ratio = 0.75,
+    -- Minimum milliseconds between requests; 0 disables.
+    throttle = 0,
+    -- Milliseconds to wait after typing stops before requesting; 0 disables.
+    debounce = 200,
+    -- Request timeout in seconds. With streaming, a timeout cut keeps the
+    -- partial text generated so far.
+    request_timeout = 3,
+    -- false, "debug", "verbose", "warn", or "error".
+    notify = 'warn',
+    curl_cmd = 'curl',
+    curl_extra_args = {},
+    -- A proxy URL passed to curl as --proxy, or nil.
+    proxy = nil,
+    -- Auto-completion fires only while every predicate returns true.
+    enable_predicates = {},
+    -- llama_cpp and openai_fim_compatible are the tested providers; others
+    -- warn on setup unless this is true.
+    allow_unsupported_providers = false,
+}
+```
 
 ## Usage
 
@@ -260,8 +334,9 @@ require('harmonize').setup {
 }
 ```
 
-With Ollama or llama.cpp, assign any non-null environment variable (e.g.
-`TERM`) as a placeholder.
+With Ollama, assign any non-null environment variable (e.g. `TERM`) as a
+placeholder. The `llama_cpp` provider needs no API key; set `api_key` only
+when your server runs with `--api-key`.
 
 ## Prompt
 
