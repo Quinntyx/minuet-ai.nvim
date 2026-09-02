@@ -23,6 +23,14 @@
 - Providers other than `llama_cpp` and `openai_fim_compatible` are
   untested; using one shows a warning on setup unless
   `allow_unsupported_providers = true`.
+- The llama_cpp provider sends extra context in the request's `input_extra`
+  field. Three background sources feed it, configured with `context_sources`:
+  treesitter captures the file's imports and the headers of the declarations
+  enclosing the cursor, recent edits keeps the last few edited regions across
+  the project, and the jumplist source keeps snippets around recently visited
+  locations. Every source caches its result, so building a request adds no
+  parsing or file reads, and chunks that repeat the cursor context are
+  dropped. The sources start only when a provider is configured.
 
 ## Renamed
 

@@ -42,6 +42,7 @@ function M.setup(config)
         require('harmonize.auto_start').ensure(M.config)
     end
     require('harmonize.virtualtext').setup()
+    require('harmonize.context').setup()
 end
 
 
@@ -110,7 +111,9 @@ function M.change_model(provider_model)
 
     M.config.provider = provider
     M.config.provider_options[provider].model = model
+    require('harmonize.context').setup()
     vim.notify(string.format('Harmonize model changed to: %s (%s)', model, provider), vim.log.levels.INFO)
+end
 end
 
 function M.change_provider(provider)
@@ -128,6 +131,7 @@ function M.change_provider(provider)
     end
 
     M.config.provider = provider
+    require('harmonize.context').setup()
     vim.notify('Harmonize Provider changed to: ' .. provider, vim.log.levels.INFO)
 end
 
@@ -146,6 +150,7 @@ function M.change_preset(preset)
 
     -- deep extend the config with preset_config
     M.config = vim.tbl_deep_extend('force', M.config, preset_config)
+    require('harmonize.context').setup()
     vim.notify('Harmonize Preset changed to: ' .. preset, vim.log.levels.INFO)
 end
 

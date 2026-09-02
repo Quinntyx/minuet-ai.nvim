@@ -236,6 +236,39 @@ local M = {
     -- context before cursor will be used. This option should be between 0 and
     -- 1, context_ratio = 0.75 means the ratio will be 3:1.
     context_ratio = 0.75,
+    -- Extra context sources composed into the llama_cpp provider's
+    -- input_extra field. Each source runs in the background and caches its
+    -- result, so building the request never waits on parsing or file reads.
+    ---@type table
+    context_sources = {
+        -- Maximum total characters of extra context across all sources.
+        max_chars = 8192,
+        -- Imports and enclosing declaration headers from the treesitter
+        -- syntax tree. Needs a parser for the filetype; without one the
+        -- source contributes nothing.
+        treesitter = {
+            enabled = true,
+            max_chars = 2048,
+        },
+        -- Recently edited regions across the project. Each region expands
+        -- by whole lines up to the character budgets.
+        recent_edits = {
+            enabled = true,
+            max_edits = 4,
+            chars_before = 384,
+            chars_after = 384,
+        },
+        -- Recently visited jumplist locations. Each location expands by
+        -- whole lines up to the character budgets.
+        jumplist = {
+            enabled = true,
+            max_jumps = 4,
+            chars_before = 384,
+            chars_after = 384,
+            -- Ignore jumps to files outside the current project root.
+            project_only = true,
+        },
+    },
     throttle = 0, -- only send the request every x milliseconds, use 0 to disable throttle.
     -- debounce the request in x milliseconds, set to 0 to disable debounce
     debounce = 200,

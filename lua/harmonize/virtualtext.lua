@@ -269,6 +269,7 @@ local function trigger(bufnr)
     end
 
     local context = utils.get_context(utils.make_cmp_context())
+    context.input_extra = require('harmonize.context').snapshot(api.nvim_get_current_buf(), context)
 
     local provider = require('harmonize.backends.' .. config.provider)
     local timestamp = uv.now()

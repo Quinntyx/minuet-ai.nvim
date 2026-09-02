@@ -185,7 +185,15 @@ require('harmonize').setup {
     -- When the context exceeds the window, the share kept before the cursor
     -- (0.75 means a 3:1 before/after split).
     context_ratio = 0.75,
-    -- Minimum milliseconds between requests; 0 disables.
+    -- Extra context from treesitter structure, recent edits, and the
+    -- jumplist; see the Configuration section. Enabled with these defaults
+    -- for the llama_cpp provider.
+    context_sources = {
+        max_chars = 8192,
+        treesitter = { enabled = true, max_chars = 2048 },
+        recent_edits = { enabled = true, max_edits = 4, chars_before = 384, chars_after = 384 },
+        jumplist = { enabled = true, max_jumps = 4, chars_before = 384, chars_after = 384, project_only = true },
+    },
     throttle = 0,
     -- Milliseconds to wait after typing stops before requesting; 0 disables.
     debounce = 200,
@@ -282,6 +290,23 @@ default_config = {
     context_window = 16000,
     -- When the context exceeds the window, the ratio kept before the cursor.
     context_ratio = 0.75,
+    -- Extra context sent to the llama_cpp provider alongside the cursor
+    -- context. Each source is collected in the background and cached, so
+    -- building a request never parses or reads files. Chunks that overlap
+    -- the cursor context are dropped, and the total is capped by max_chars.
+    context_sources = {
+        max_chars = 8192,
+        -- Imports and the headers of the declarations enclosing the cursor,
+        -- from the treesitter syntax tree. Needs a parser for the filetype;
+        -- without one this source sends nothing.
+        treesitter = { enabled = true, max_chars = 2048 },
+        -- Recently edited regions across the project, expanded by whole
+        -- lines around each edit.
+        recent_edits = { enabled = true, max_edits = 4, chars_before = 384, chars_after = 384 },
+        -- Recently visited jumplist locations, expanded by whole lines
+        -- around each jump.
+        jumplist = { enabled = true, max_jumps = 4, chars_before = 384, chars_after = 384, project_only = true },
+    },
     throttle = 0, -- only request every x ms; 0 disables
     debounce = 200, -- debounce requests by x ms; 0 disables
     -- false, "debug", "verbose", "warn", or "error"

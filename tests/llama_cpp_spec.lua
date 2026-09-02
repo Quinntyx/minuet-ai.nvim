@@ -120,4 +120,55 @@ return {
             end)
         end,
     },
+    {
+        name = 'llama_cpp forwards context.input_extra as input_extra',
+        run = function()
+            helpers.setup_root_config {
+                before_cursor_filter_length = 0,
+                after_cursor_filter_length = 0,
+            }
+
+            local context_with_extra = vim.deepcopy(context)
+            context_with_extra.input_extra = {
+                { filename = 'src/utils.lua', text = 'local function helper() end' },
+            }
+
+            with_mocked_job(function(get)
+                local backend = helpers.reload 'harmonize.backends.llama_cpp'
+                local result
+
+                backend.complete(context_with_extra, function(items)
+                    result = items
+                end)
+
+                local body = request_body(get().args)
+                helpers.expect_equal(body.input_extra, {
+                    { filename = 'src/utils.lua', text = 'local function helper() end' },
+                })
+
+                local handlers = get().handlers
+                handlers.on_stdout(nil, 'data: {"content":"ok","stop":true}\r\n')
+                handlers.on_exit({}, { code = 0 })
+                helpers.expect_equal(result, { 'ok' })
+            end)
+        end,
+    },
+    {
+        name = 'llama_cpp omits input_extra when the context has none',
+        run = function()
+            helpers.setup_root_config {
+                before_cursor_filter_length = 0,
+                after_cursor_filter_length = 0,
+            }
+
+            with_mocked_job(function(get)
+                local backend = helpers.reload 'harmonize.backends.llama_cpp'
+
+                backend.complete(context, function() end)
+
+                local body = request_body(get().args)
+                helpers.expect_falsy(body.input_extra)
+            end)
+        end,
+    },
 }

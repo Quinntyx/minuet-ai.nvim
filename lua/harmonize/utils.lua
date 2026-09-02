@@ -206,6 +206,9 @@ end
 ---   - opts: table - Options indicating if context was truncated:
 ---     - is_incomplete_before: boolean - True if content before cursor was truncated
 ---     - is_incomplete_after: boolean - True if content after cursor was truncated
+---   - covered_lines: table - 0-based line range already sent as lines_before/lines_after.
+---     `start` is the first line included in lines_before, `end_exclusive` the
+---     line after the last line of lines_after (nil means through end of file).
 function M.get_context(cmp_context)
     local config = require('harmonize').config
 
@@ -221,6 +224,9 @@ function M.get_context(cmp_context)
 
     local n_chars_before = vim.fn.strchars(lines_before)
     local n_chars_after = vim.fn.strchars(lines_after)
+
+    local full_before = lines_before
+    local full_after = lines_after
 
     local opts = {
         is_incomplete_before = false,
@@ -254,10 +260,24 @@ function M.get_context(cmp_context)
         end
     end
 
+    -- Work out which buffer lines the truncated strings already cover so
+    -- extra context chunks overlapping them can be dropped.
+    local covered_start = 0
+    if opts.is_incomplete_before then
+        local removed = vim.fn.strcharpart(full_before, 0, n_chars_before - vim.fn.strchars(lines_before))
+        covered_start = select(2, removed:gsub('\n', ''))
+    end
+
+    local covered_end_exclusive
+    if opts.is_incomplete_after then
+        covered_end_exclusive = cursor.line + 1 + select(2, lines_after:gsub('\n', ''))
+    end
+
     return {
         lines_before = lines_before,
         lines_after = lines_after,
         opts = opts,
+        covered_lines = { start = covered_start, end_exclusive = covered_end_exclusive },
     }
 end
 

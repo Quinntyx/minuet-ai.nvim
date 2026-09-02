@@ -31,6 +31,10 @@ M.complete = function(context, callback, on_update)
         input_suffix = context.lines_after,
         stream = options.stream,
     }
+    -- Extra context chunks from the background context sources.
+    if context.input_extra and #context.input_extra > 0 then
+        data.input_extra = context.input_extra
+    end
     data = vim.tbl_deep_extend('force', data, options.optional or {})
 
     local headers = {
