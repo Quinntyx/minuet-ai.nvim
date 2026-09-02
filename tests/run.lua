@@ -11,6 +11,14 @@ package.path = table.concat({
     package.path,
 }, ';')
 
+-- Every production module must at least parse: the root harmonize module
+-- is mocked in most specs, so its syntax errors would otherwise go unseen.
+for _, file in ipairs(vim.fn.globpath(root .. '/lua', '**/*.lua', false, true)) do
+    local ok, err = loadfile(file)
+    if not ok then
+        error(('failed to parse %s\n%s'):format(file, err))
+    end
+end
 local spec_files = vim.fn.globpath(root .. '/tests', '*_spec.lua', false, true)
 table.sort(spec_files)
 
