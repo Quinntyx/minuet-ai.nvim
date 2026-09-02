@@ -25,6 +25,11 @@ line as the model generates tokens.
   OpenAI FIM-compatible service. Other providers inherited from
   minuet-ai.nvim are present but untested.
 
+## Benchmarks
+
+Work in progress: time-to-first-token and time-to-first-line measurements for
+local llama.cpp setups will live here.
+
 ## Requirements
 
 - Neovim 0.10+
@@ -41,7 +46,22 @@ line as the model generates tokens.
     'Quinntyx/harmonize.nvim',
     config = function()
         require('harmonize').setup {
-            -- see the sample config below
+            provider = 'llama_cpp',
+            provider_options = {
+                llama_cpp = {
+                    end_point = 'http://localhost:8012/infill',
+                    optional = {
+                        n_predict = 256,
+                        top_p = 0.9,
+                    },
+                },
+            },
+            auto_start = {
+                model = 'ggml-org/Qwen2.5-Coder-1.5B-Q8_0-GGUF',
+                host = '127.0.0.1',
+                port = 8012,
+                extra_args = { '-ngl', '99', '--ctx-size', '8192' },
+            },
         }
     end,
 }
@@ -49,57 +69,34 @@ line as the model generates tokens.
 
 ## Quick Start
 
-The fastest way to get a local model running is the `llama_cpp` provider with
-`auto_start`: it downloads a llama.cpp binary if needed, starts `llama serve`
-for you (the model is pulled from HuggingFace on the first start), and points
-the provider's `/infill` endpoint at it.
+The installation snippet above is a working setup: the `llama_cpp` provider
+talks to llama.cpp's native `/infill` endpoint, and the `auto_start` table
+has harmonize start the server for you — it downloads a llama.cpp binary if
+needed, runs `llama serve` with the model (pulled from HuggingFace on the
+first start), and leaves the server running when nvim exits so the next
+launch reuses it without reloading the model.
+
+Notes on `auto_start`:
+
+- It is nil by default, so a blank config never downloads a model or loads it
+  into VRAM. Setting it to a table opts in; a partial table merges over
+  `default_auto_start`, so `{ model = '...' }` alone is a complete setup.
+- If `llama` or `llama-server` is already on PATH it is used as is; otherwise
+  one is downloaded. The first start downloads the model, so the first
+  request may fail until it is ready.
+- Set `kill_on_exit = true` to stop the server when nvim exits — but with
+  several nvim instances sharing one server, the first one to exit would kill
+  it for everyone.
+- Keep `provider_options.llama_cpp.end_point` in sync with the host and port.
+
+Prefer to manage the server yourself? Leave `auto_start` unset and point the
+provider at your server — you still get the native `/infill` endpoint, which
+constructs the FIM prompt from the model's own tokens (no per-model template
+needed):
 
 ```lua
 require('harmonize').setup {
     provider = 'llama_cpp',
-}
-```
-
-That defaults to Qwen2.5-Coder-1.5B (FIM-capable, ~1.6 GB) on
-`127.0.0.1:8012`. The server is configured on `auto_start`:
-
-```lua
-require('harmonize').setup {
-    provider = 'llama_cpp',
-    auto_start = {
-        -- any HuggingFace GGUF repo, or a local .gguf path
-        model = 'ggml-org/Qwen2.5-Coder-0.6B-Q4_K_M-GGUF',
-        host = '127.0.0.1',
-        port = 8012,
-        -- extra arguments in the style of curl_extra_args (GPU offload,
-        -- context size, ...)
-        extra_args = { '-ngl', '99', '--ctx-size', '8192' },
-    },
-}
-```
-
-Keep `provider_options.llama_cpp.end_point` in sync with the host and port;
-the defaults already agree.
-
-If `llama` or `llama-server` is already on PATH, it is used as is; otherwise
-one is downloaded. The first start downloads the model, so the first request
-may fail until it is ready.
-
-By default the server keeps running after nvim exits, so the next launch
-reuses it without reloading the model. Set `kill_on_exit = true` on
-`auto_start` to stop it when nvim exits — but with
-several nvim instances sharing one server, the first one to exit would kill
-it for everyone.
-
-Prefer your own setup? Set `auto_start = nil` and point the provider at a
-server you manage — you still get llama.cpp's native `/infill` endpoint,
-which constructs the FIM prompt from the model's own tokens (no per-model
-template needed):
-
-```lua
-require('harmonize').setup {
-    provider = 'llama_cpp',
-    auto_start = nil,
     provider_options = {
         llama_cpp = {
             end_point = 'http://localhost:8012/infill',
@@ -146,11 +143,11 @@ require('harmonize').setup {
         toggle = '<M-c>',      -- toggle auto-completion on and off
     },
 
-    -- Server startup for the llama_cpp provider: when nothing answers at
-    -- host:port, harmonize runs the command below with the model and leaves
-    -- the server running when nvim exits. Set auto_start = nil to run the
-    -- server yourself and keep provider_options.llama_cpp.end_point pointed
-    -- at it.
+    -- Server startup for the llama_cpp provider (nil by default — this
+    -- table opts in): when nothing answers at host:port, harmonize runs the
+    -- command below with the model and leaves the server running when nvim
+    -- exits. Drop this table to run the server yourself and keep
+    -- provider_options.llama_cpp.end_point pointed at it.
     auto_start = {
         cmd = 'llama serve', -- binary looked up on PATH; downloaded when missing
         model = 'ggml-org/Qwen2.5-Coder-1.5B-Q8_0-GGUF', -- HF repo or local .gguf path
@@ -289,9 +286,10 @@ default_config = {
     proxy = nil,
     -- A list of predicates; auto-completion fires only while all return true.
     enable_predicates = {},
-    -- Start (or reuse) a llama.cpp server for the llama_cpp provider;
-    -- see the Quick Start section. Set to nil to run the server yourself.
-    auto_start = { ... },
+    -- Opt in to harmonize starting (or reusing) a llama.cpp server for the
+    -- llama_cpp provider; see the Quick Start section. Nil by default, so a
+    -- blank config never downloads a model or loads it into VRAM.
+    auto_start = nil,
     provider_options = {
         -- see the Quick Start section for llama_cpp and the Providers
         -- section for the other providers' defaults
@@ -556,9 +554,13 @@ remote APIs. Locally, `qwen-2.5-coder` (via Ollama or llama.cpp) is a good
 default. Avoid thinking models — the extra latency hurts completion even on
 fast models.
 
-Latency (time to first token) matters more than throughput for completion.
-Ideally latency stays under ~1s with throughput above ~100 tokens/s. For local
-models, the `llama_cpp` provider uses llama.cpp's native `/infill` endpoint.
+Latency beats quality for completion: harmonize completes incrementally, so
+a fast first token on a smaller model is worth more than a slow one on a
+better one. Aim for a time to first token of 50–100 ms — streaming from a
+local llama.cpp server is the default setup for exactly this reason.
+Throughput still matters, but only for how quickly the rest of the
+suggestion arrives after the first chunk. For local models, the `llama_cpp`
+provider uses llama.cpp's native `/infill` endpoint.
 
 ## Commands
 

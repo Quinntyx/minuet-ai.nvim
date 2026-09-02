@@ -216,25 +216,13 @@ local M = {
     -- providers are kept for compatibility and warn on setup unless this is
     -- true.
     allow_unsupported_providers = false,
-    -- Start a llama.cpp server for the llama_cpp provider when none is
-    -- running at the host and port below. Set to nil to run the server
+    -- When set to a table, starts a llama.cpp server for the llama_cpp
+    -- provider when none is running at the host and port below; fields
+    -- merge over harmonize.default_auto_start. Nil by default, so a blank
+    -- config never downloads a model or loads it into VRAM: run the server
     -- yourself and point provider_options.llama_cpp.end_point at it.
-    auto_start = {
-        -- The base command. The binary is looked up on PATH; a downloaded
-        -- llama.cpp release is used when it is missing.
-        cmd = 'llama serve',
-        -- A Hugging Face GGUF repo or a local model file.
-        model = 'ggml-org/Qwen2.5-Coder-1.5B-Q8_0-GGUF',
-        -- Extra command-line arguments, in the style of curl_extra_args.
-        ---@type string[] | fun(): string[]
-        extra_args = {},
-        -- Stop the server when nvim exits.
-        kill_on_exit = false,
-        -- Where the server listens; keep
-        -- provider_options.llama_cpp.end_point in sync.
-        host = '127.0.0.1',
-        port = 8012,
-    },
+    ---@type table?
+    auto_start = nil,
     -- the maximum total characters of the context before and after the cursor
     -- 16000 characters typically equate to approximately 4,000 tokens for
     -- LLMs.
@@ -318,6 +306,24 @@ M.default_fim_template = {
     suffix = default_fim_suffix,
 }
 
+-- Defaults for the opt-in auto_start table, which starts a llama.cpp server
+-- for the llama_cpp provider when none is running at host:port.
+M.default_auto_start = {
+    -- The base command. The binary is looked up on PATH; a downloaded
+    -- llama.cpp release is used when it is missing.
+    cmd = 'llama serve',
+    -- A Hugging Face GGUF repo or a local model file.
+    model = 'ggml-org/Qwen2.5-Coder-1.5B-Q8_0-GGUF',
+    -- Extra command-line arguments, in the style of curl_extra_args.
+    ---@type string[] | fun(): string[]
+    extra_args = {},
+    -- Stop the server when nvim exits.
+    kill_on_exit = false,
+    -- Where the server listens; keep provider_options.llama_cpp.end_point
+    -- in sync.
+    host = '127.0.0.1',
+    port = 8012,
+}
 M.provider_options = {
     llama_cpp = {
         -- llama.cpp's native fill-in-the-middle endpoint: the server

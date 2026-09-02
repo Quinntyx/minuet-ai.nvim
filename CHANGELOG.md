@@ -40,10 +40,11 @@
   `auto_start` namespace. The provider talks to llama.cpp's native
   `/infill` endpoint, where the server constructs the FIM prompt with the
   model's own tokens, so the per-model template hack is gone.
-  `auto_start` (on by default; `nil` manages the server yourself) starts a
-  llama.cpp server when none is running at its host and port, configured
-  with the base command, the model, `extra_args` in the style of
-  `curl_extra_args`, and `kill_on_exit`.
+  `auto_start` (nil by default, so a blank config never downloads a model
+  or loads it into VRAM) starts a llama.cpp server when none is running at
+  its host and port; a partial table merges over `default_auto_start`, and
+  the full table takes the base command, the model, `extra_args` in the
+  style of `curl_extra_args`, and `kill_on_exit`.
 - Suggestion choice cycling was removed along with the `next`/`prev` actions
   and keymaps; the first completion suggestion is used. The manual invoke
   that shared the `next` key moved to a dedicated `trigger` action, bindable

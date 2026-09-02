@@ -2,17 +2,48 @@ local helpers = require 'tests.helpers'
 
 return {
     {
-        name = 'auto_start and llama_cpp provider options default to Qwen2.5-Coder-1.5B on port 8012',
+        name = 'auto_start is nil by default and its defaults live on the module',
         run = function()
             local root = helpers.setup_root_config()
 
-            local auto = root.config.auto_start
+            helpers.expect_falsy(root.config.auto_start, 'a blank config must not start a server')
+
+            local auto = require('harmonize.config').default_auto_start
             helpers.expect_equal(auto.cmd, 'llama serve')
             helpers.expect_equal(auto.model, 'ggml-org/Qwen2.5-Coder-1.5B-Q8_0-GGUF')
             helpers.expect_equal(auto.extra_args, {})
             helpers.expect_falsy(auto.kill_on_exit)
             helpers.expect_equal(auto.host, '127.0.0.1')
             helpers.expect_equal(auto.port, 8012)
+        end,
+    },
+    {
+        name = 'a partial auto_start table merges over the defaults',
+        run = function()
+            local root = helpers.setup_root_config {
+                auto_start = { model = '/models/qwen.gguf' },
+            }
+
+            -- Mirror the merge ensure() performs.
+            local opts = vim.tbl_deep_extend(
+                'force',
+                require('harmonize.config').default_auto_start,
+                root.config.auto_start
+            )
+            helpers.expect_equal(opts.cmd, 'llama serve')
+            helpers.expect_equal(opts.model, '/models/qwen.gguf')
+            helpers.expect_equal(opts.port, 8012)
+        end,
+    },
+    {
+        name = 'llama_cpp provider options default to the /infill endpoint on port 8012',
+        run = function()
+            local root = helpers.setup_root_config()
+
+            local opts = root.config.provider_options.llama_cpp
+            helpers.expect_equal(opts.end_point, 'http://127.0.0.1:8012/infill')
+            helpers.expect_falsy(opts.api_key)
+            helpers.expect_equal(opts.stream, true)
 
             local opts = root.config.provider_options.llama_cpp
             helpers.expect_equal(opts.end_point, 'http://127.0.0.1:8012/infill')
