@@ -2,17 +2,15 @@ local helpers = require 'tests.helpers'
 
 return {
     {
-        name = 'utils.make_tmp_file writes the exact JSON body in the nvim temp directory',
+        name = 'transport writes the exact JSON body in the nvim temp directory',
         run = function()
-            helpers.setup_root_config()
-
-            local utils = helpers.reload 'harmonize.utils'
+            local transport = helpers.reload('harmonize.transport').new(helpers.merged_config())
             local content = {
                 message = 'hello',
                 count = 2,
             }
             local expected = vim.json.encode(content)
-            local data_file = utils.make_tmp_file(content)
+            local data_file = transport:write_body_file(content)
 
             helpers.expect_truthy(data_file)
             helpers.expect_equal(
@@ -30,44 +28,29 @@ return {
         end,
     },
     {
-        name = 'utils.trim_completion_items skips whitespace-only completion items',
+        name = 'text.trim_completion_items skips whitespace-only completion items',
         run = function()
-            helpers.setup_root_config()
+            local text = helpers.reload 'harmonize.text'
 
-            local utils = helpers.reload 'harmonize.utils'
-
-            helpers.expect_equal(utils.trim_completion_items { '  foo  ', '   ', '\n\t', ' bar' }, { 'foo', 'bar' })
+            helpers.expect_equal(text.trim_completion_items { '  foo  ', '   ', '\n\t', ' bar' }, { 'foo', 'bar' })
         end,
     },
     {
-        name = 'utils.filter_text keeps leading newline while matching duplicated context',
+        name = 'text.filter_text keeps leading newline while matching duplicated context',
         run = function()
-            helpers.setup_root_config {
-                before_cursor_filter_length = 2,
-                after_cursor_filter_length = 0,
-            }
+            local text = helpers.reload 'harmonize.text'
 
-            local utils = helpers.reload 'harmonize.utils'
-
-            helpers.expect_equal(
-                utils.filter_text('\nfoo', {
-                    lines_before = 'foo',
-                    lines_after = '',
-                }),
-                '\nfoo'
-            )
+            helpers.expect_equal(text.filter_text('\nfoo', 'foo', '', 2, 0), '\nfoo')
         end,
     },
     {
-        name = 'utils.no_stream_decode ignores non-string extracted text',
+        name = 'response.no_stream_decode ignores non-string extracted text',
         run = function()
-            helpers.setup_root_config()
-
-            local utils = helpers.reload 'harmonize.utils'
+            local response = helpers.reload 'harmonize.backend.response'
             local data_file = vim.fn.tempname()
             vim.fn.writefile({ '{}' }, data_file)
 
-            local result = utils.no_stream_decode(
+            local result = response.no_stream_decode(
                 {
                     code = 0,
                     stdout = vim.json.encode {
@@ -88,13 +71,11 @@ return {
         end,
     },
     {
-        name = 'utils.make_system_prompt expands placeholders and drops unresolved ones',
+        name = 'chat.make_system_prompt expands placeholders and drops unresolved ones',
         run = function()
-            helpers.setup_root_config()
+            local chat = helpers.reload 'harmonize.chat'
 
-            local utils = helpers.reload 'harmonize.utils'
-
-            local system_prompt = utils.make_system_prompt({
+            local system_prompt = chat.make_system_prompt({
                 template = '{{{prompt}}} | {{{guidelines}}} | {{{n_completion_template}}} | {{{x}}} mid {{{y}}} end',
                 prompt = 'the prompt',
                 guidelines = function()
@@ -111,13 +92,11 @@ return {
         end,
     },
     {
-        name = 'utils.make_system_prompt drops n_completion_template when n_completion is nil',
+        name = 'chat.make_system_prompt drops n_completion_template when n_completion is nil',
         run = function()
-            helpers.setup_root_config()
+            local chat = helpers.reload 'harmonize.chat'
 
-            local utils = helpers.reload 'harmonize.utils'
-
-            local system_prompt = utils.make_system_prompt({
+            local system_prompt = chat.make_system_prompt({
                 template = '{{{prompt}}}{{{n_completion_template}}}',
                 prompt = 'p',
                 n_completion_template = 'give %d completions',
@@ -127,13 +106,11 @@ return {
         end,
     },
     {
-        name = 'utils.make_chat_llm_shot renders each template with context-aware values',
+        name = 'chat.make_chat_llm_shot renders each template with context-aware values',
         run = function()
-            helpers.setup_root_config()
+            local chat = helpers.reload 'harmonize.chat'
 
-            local utils = helpers.reload 'harmonize.utils'
-
-            local shots = utils.make_chat_llm_shot({
+            local shots = chat.make_chat_llm_shot({
                 lines_before = 'above',
                 lines_after = 'below',
                 opts = { language = 'lua' },
@@ -154,13 +131,11 @@ return {
         end,
     },
     {
-        name = 'utils.make_chat_llm_shot accepts plain string values',
+        name = 'chat.make_chat_llm_shot accepts plain string values',
         run = function()
-            helpers.setup_root_config()
+            local chat = helpers.reload 'harmonize.chat'
 
-            local utils = helpers.reload 'harmonize.utils'
-
-            local shots = utils.make_chat_llm_shot({}, {
+            local shots = chat.make_chat_llm_shot({}, {
                 template = '{{{static}}}',
                 static = 'fixed text',
             })
@@ -169,16 +144,14 @@ return {
         end,
     },
     {
-        name = 'utils.expand_template keeps substituted values literal',
+        name = 'chat.expand_template keeps substituted values literal',
         run = function()
-            helpers.setup_root_config()
+            local chat = helpers.reload 'harmonize.chat'
 
-            local utils = helpers.reload 'harmonize.utils'
-
-            local rendered = utils.expand_template('{{{a}}}', {
+            local rendered = chat.expand_template('{{{a}}}', {
                 a = '{{{b}}}',
                 b = 'must not appear',
-            }, utils.get_or_eval_value)
+            }, chat.get_or_eval)
 
             helpers.expect_equal(rendered, '{{{b}}}', 'inserted values must not be rescanned or stripped')
         end,

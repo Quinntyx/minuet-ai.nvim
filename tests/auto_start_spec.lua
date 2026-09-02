@@ -4,9 +4,9 @@ return {
     {
         name = 'auto_start is nil by default and its defaults live on the module',
         run = function()
-            local root = helpers.setup_root_config()
+            local config = helpers.merged_config()
 
-            helpers.expect_falsy(root.config.auto_start, 'a blank config must not start a server')
+            helpers.expect_falsy(config.auto_start, 'a blank config must not start a server')
 
             local auto = require('harmonize.config').default_auto_start
             helpers.expect_equal(auto.cmd, 'llama serve')
@@ -20,7 +20,7 @@ return {
     {
         name = 'a partial auto_start table merges over the defaults',
         run = function()
-            local root = helpers.setup_root_config {
+            local config = helpers.merged_config {
                 auto_start = { model = '/models/qwen.gguf' },
             }
 
@@ -28,7 +28,7 @@ return {
             local opts = vim.tbl_deep_extend(
                 'force',
                 require('harmonize.config').default_auto_start,
-                root.config.auto_start
+                config.auto_start
             )
             helpers.expect_equal(opts.cmd, 'llama serve')
             helpers.expect_equal(opts.model, '/models/qwen.gguf')
@@ -38,14 +38,9 @@ return {
     {
         name = 'llama_cpp provider options default to the /infill endpoint on port 8012',
         run = function()
-            local root = helpers.setup_root_config()
+            local config = helpers.merged_config()
 
-            local opts = root.config.provider_options.llama_cpp
-            helpers.expect_equal(opts.end_point, 'http://127.0.0.1:8012/infill')
-            helpers.expect_falsy(opts.api_key)
-            helpers.expect_equal(opts.stream, true)
-
-            local opts = root.config.provider_options.llama_cpp
+            local opts = config.provider_options.llama_cpp
             helpers.expect_equal(opts.end_point, 'http://127.0.0.1:8012/infill')
             helpers.expect_falsy(opts.api_key)
             helpers.expect_equal(opts.stream, true)
@@ -54,16 +49,14 @@ return {
     {
         name = 'server command builds the llama serve invocation with the extra arguments',
         run = function()
-            helpers.setup_root_config()
-
-            local auto_start = helpers.reload 'harmonize.auto_start'
+            local install = helpers.reload 'harmonize.backend.llama_install'
             local original_executable = vim.fn.executable
             vim.fn.executable = function(name)
                 return name == 'llama' and 1 or 0
             end
 
             local ok, err = xpcall(function()
-                local cmd = auto_start.server_cmd({
+                local cmd = install.server_cmd({
                     cmd = 'llama serve',
                     model = 'ggml-org/Qwen2.5-Coder-1.5B-Q8_0-GGUF',
                     extra_args = { '-ngl', '99', '--ctx-size', '8192' },
@@ -81,7 +74,7 @@ return {
 
                 -- A local model file is passed with --model instead of -hf,
                 -- and a function returning a list works for extra_args too.
-                cmd = auto_start.server_cmd({
+                cmd = install.server_cmd({
                     cmd = 'llama serve',
                     model = '/models/qwen.gguf',
                     extra_args = function()
@@ -102,7 +95,7 @@ return {
                 vim.fn.executable = function(name)
                     return name == 'llama-server' and 1 or 0
                 end
-                cmd = auto_start.server_cmd({
+                cmd = install.server_cmd({
                     cmd = 'llama-server',
                     model = 'ggml-org/Qwen2.5-Coder-1.5B-Q8_0-GGUF',
                     extra_args = {},
@@ -125,16 +118,14 @@ return {
     {
         name = 'server command gives up when no llama.cpp binary can be resolved',
         run = function()
-            helpers.setup_root_config()
-
-            local auto_start = helpers.reload 'harmonize.auto_start'
+            local install = helpers.reload 'harmonize.backend.llama_install'
             local original_executable = vim.fn.executable
             vim.fn.executable = function()
                 return 0
             end
 
             local ok, err = xpcall(function()
-                local cmd = auto_start.server_cmd({
+                local cmd = install.server_cmd({
                     cmd = 'llama serve',
                     model = 'ggml-org/Qwen2.5-Coder-1.5B-Q8_0-GGUF',
                     extra_args = {},
