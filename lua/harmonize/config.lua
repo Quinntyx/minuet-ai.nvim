@@ -108,9 +108,9 @@ local n_completion_template = '8. Provide at most %d completion items.'
 local default_system_template = '{{{prompt}}}\n{{{guidelines}}}\n{{{n_completion_template}}}'
 
 local default_fim_prompt = function(context_before_cursor, _, _)
-    local utils = require 'harmonize.utils'
-    local language = utils.add_language_comment()
-    local tab = utils.add_tab_comment()
+    local comment = require 'harmonize.comment'
+    local language = comment.add_language_comment()
+    local tab = comment.add_tab_comment()
     context_before_cursor = language .. '\n' .. tab .. '\n' .. context_before_cursor
 
     return context_before_cursor
@@ -120,15 +120,6 @@ local default_fim_suffix = function(_, context_after_cursor, _)
     return context_after_cursor
 end
 
-local function default_after_cursor_filter_length()
-    local config = require('harmonize').config
-    return (config.provider == 'codestral' or config.provider == 'openai_fim_compatible') and 0 or 15
-end
-
-local function default_before_cursor_filter_length()
-    local config = require('harmonize').config
-    return (config.provider == 'codestral' or config.provider == 'openai_fim_compatible') and 0 or 2
-end
 
 ---@class harmonize.ChatInputExtraInfo
 ---@field is_incomplete_before boolean
@@ -149,12 +140,12 @@ end
 local default_chat_input = {
     template = '{{{language}}}\n{{{tab}}}\n<contextAfterCursor>\n{{{context_after_cursor}}}\n<contextBeforeCursor>\n{{{context_before_cursor}}}<cursorPosition>',
     language = function(_, _, _)
-        local utils = require 'harmonize.utils'
-        return utils.add_language_comment()
+        local comment = require 'harmonize.comment'
+        return comment.add_language_comment()
     end,
     tab = function(_, _, _)
-        local utils = require 'harmonize.utils'
-        return utils.add_tab_comment()
+        local comment = require 'harmonize.comment'
+        return comment.add_tab_comment()
     end,
     context_before_cursor = function(context_before_cursor, _, opts)
         if opts.is_incomplete_before then
@@ -305,10 +296,13 @@ local M = {
     -- 20-character string that exactly matches the 20 characters following the
     -- cursor, the candidate will be truncated by those 20 characters before
     -- being delivered.
-    after_cursor_filter_length = default_after_cursor_filter_length,
+    -- Each provider falls back to its own default when this key is not set.
+    ---@type integer?
+    after_cursor_filter_length = nil,
     -- Similar to after_cursor_filter_length but trim the completion item from
-    -- prefix instead of suffix.
-    before_cursor_filter_length = default_before_cursor_filter_length,
+    -- prefix instead of suffix. Each provider falls back to its own default.
+    ---@type integer?
+    before_cursor_filter_length = nil,
     proxy = nil,
 }
 
